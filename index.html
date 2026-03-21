@@ -3,847 +3,244 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SE Player</title>
+  <title>PenguinSoundEffectPlayer</title>
   <meta name="description" content="声劇・舞台用SEプレイヤー" />
-  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="theme-color" content="#030d1a" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@100;200;300;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;700&family=Exo+2:wght@200;300;400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #07070d;
-      --surface: #0d0d1a;
-      --surface2: #13131f;
-      --surface3: #1a1a2e;
-      --border: #1e1e3a;
-      --border-bright: #2a2a50;
-      --accent: #00d4ff;
-      --accent2: #7b2fff;
-      --accent3: #ff2f7b;
-      --text: #c8d0e8;
-      --text-dim: #5a6080;
-      --text-bright: #e8f0ff;
-      --active: #00d4ff22;
-      --playing: #00d4ff44;
-      --warn: #ff8c00;
-      --mono: 'Share Tech Mono', monospace;
-      --sans: 'Rajdhani', sans-serif;
-      --light: 'Exo 2', sans-serif;
+      --bg:        #030d1a;
+      --surface:   #071628;
+      --surface2:  #0a1e36;
+      --surface3:  #0e2642;
+      --border:    #0e2440;
+      --border-b:  #1a3a5c;
+      --border-ice:#4ab8d470;
+      --accent:    #7dd8f0;
+      --accent2:   #00b4d8;
+      --accent3:   #caf0f8;
+      --accent4:   #48cae4;
+      --danger:    #e05c7a;
+      --warn:      #ffa040;
+      --text:      #b8d8e8;
+      --text-dim:  #3a6480;
+      --text-bright:#e0f4ff;
+      --active:    rgba(0,180,216,0.12);
+      --playing:   rgba(125,216,240,0.18);
+      --mono:      'Share Tech Mono', monospace;
+      --title:     'Orbitron', sans-serif;
+      --sans:      'Exo 2', sans-serif;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+    body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 20% 0%,rgba(0,180,216,.07) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(72,202,228,.05) 0%,transparent 60%),repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(125,216,240,.012) 3px,rgba(125,216,240,.012) 4px);pointer-events:none;z-index:0}
+    #app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      min-height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
+    /* HEADER */
+    header{display:flex;align-items:center;gap:12px;padding:8px 16px;background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);border-bottom:1px solid var(--border-b);flex-shrink:0;position:relative;overflow:hidden}
+    header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent4),var(--accent),var(--accent4),transparent);opacity:.5}
+    .logo-block{display:flex;align-items:baseline;gap:8px;flex-shrink:0}
+    .logo{font-family:var(--title);font-size:14px;font-weight:700;color:var(--accent3);text-shadow:0 0 14px var(--accent),0 0 36px rgba(125,216,240,.25);letter-spacing:1px;white-space:nowrap}
+    .logo-ver{font-family:var(--mono);font-size:10px;color:var(--accent2);opacity:.8}
+    .key-hints{display:flex;gap:4px;flex-wrap:nowrap;overflow:hidden}
+    .key-hint{display:flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;color:var(--text-dim);cursor:pointer;padding:2px 5px;border-radius:4px;border:1px solid transparent;transition:all .15s;white-space:nowrap;user-select:none}
+    .key-hint:hover{border-color:var(--border-b);color:var(--accent4);background:var(--surface3)}
+    kbd{background:var(--surface3);border:1px solid var(--border-b);border-radius:3px;padding:1px 4px;font-family:var(--mono);font-size:9px;color:var(--accent4);white-space:nowrap}
+    .header-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+    .vol-section{display:flex;align-items:center;gap:6px;background:var(--surface3);border:1px solid var(--border-b);border-radius:6px;padding:5px 9px}
+    .vol-label{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:2px}
+    input[type=range].vol-slider{-webkit-appearance:none;width:80px;height:3px;background:var(--border-b);border-radius:2px;outline:none;cursor:pointer}
+    input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 5px var(--accent);cursor:pointer}
+    .vol-display{font-family:var(--mono);font-size:12px;color:var(--accent);min-width:30px;text-align:right}
+    .btn-import{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--accent2),var(--accent4));color:var(--bg);border:none;border-radius:6px;padding:6px 12px;font-family:var(--title);font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;flex-shrink:0}
+    .btn-import:hover{filter:brightness(1.15);box-shadow:0 0 12px var(--accent2)}
+    .btn-import svg{width:12px;height:12px}
+    .btn-reset-all{display:flex;align-items:center;gap:4px;background:transparent;color:var(--danger);border:1px solid rgba(224,92,122,.35);border-radius:6px;padding:5px 10px;font-family:var(--mono);font-size:9px;cursor:pointer;transition:all .15s;flex-shrink:0}
+    .btn-reset-all:hover{background:rgba(224,92,122,.1);border-color:var(--danger)}
+    .btn-reset-all svg{width:11px;height:11px}
 
-    /* Scanline effect */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,212,255,0.015) 2px,
-        rgba(0,212,255,0.015) 4px
-      );
-      pointer-events: none;
-      z-index: 9999;
-    }
+    /* MAIN */
+    main{display:flex;flex:1;overflow:hidden}
+    #playlist-panel{display:flex;flex-direction:column;flex:1;overflow:hidden}
+    .panel-header{display:flex;align-items:center;padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
+    .panel-title{font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:3px}
+    #drop-zone{flex:1;overflow-y:auto;position:relative}
+    #drop-zone.drag-over::after{content:'DROP FILES HERE';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,180,216,.07);border:2px dashed var(--accent2);font-family:var(--mono);font-size:16px;color:var(--accent2);letter-spacing:6px;z-index:10;pointer-events:none}
+    #drop-zone::-webkit-scrollbar{width:4px}
+    #drop-zone::-webkit-scrollbar-track{background:var(--surface)}
+    #drop-zone::-webkit-scrollbar-thumb{background:var(--border-b);border-radius:2px}
+    #empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:var(--text-dim)}
+    #empty-state svg{width:42px;height:42px;opacity:.2}
+    #empty-state p{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-align:center;line-height:2}
+    #se-list{list-style:none;padding:6px;display:flex;flex-direction:column;gap:3px}
 
-    /* Grid noise background */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
-    }
+    .se-item{display:grid;grid-template-columns:28px 1fr 54px 24px;align-items:center;gap:7px;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:border-color .1s,background .1s;user-select:none;position:relative}
+    .se-item:hover{border-color:var(--border-b);background:var(--surface3)}
+    .se-item.active{border-color:var(--accent2);background:var(--active)}
+    .se-item.playing{border-color:var(--accent);background:var(--playing);animation:icePulse 2s ease-in-out infinite}
+    .se-item.dragging{opacity:.3;border-style:dashed}
+    .se-item.drag-over-top{border-top:2px solid var(--accent2)}
+    .se-item.drag-over-bottom{border-bottom:2px solid var(--accent2)}
+    @keyframes icePulse{0%,100%{box-shadow:0 0 8px rgba(125,216,240,.1)}50%{box-shadow:0 0 20px rgba(125,216,240,.25)}}
+    .drag-handle{position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent;border-radius:6px 0 0 6px;cursor:grab;transition:background .15s}
+    .se-item:hover .drag-handle{background:var(--border-b)}
+    .se-item.active .drag-handle{background:var(--accent2)}
+    .se-item.playing .drag-handle{background:var(--accent)}
+    .se-index{font-family:var(--mono);font-size:11px;color:var(--text-dim);text-align:center}
+    .se-item.active .se-index{color:var(--accent2)}
+    .se-item.playing .se-index{color:var(--accent)}
+    .se-info{display:flex;flex-direction:column;gap:1px;overflow:hidden}
+    .se-name{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--text-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .se-item.active .se-name,.se-item.playing .se-name{color:var(--accent3)}
+    .se-meta{display:flex;gap:6px;font-family:var(--mono);font-size:9px;color:var(--text-dim)}
+    .se-waveform{width:54px;height:18px;flex-shrink:0}
+    .btn-settings{background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-dim);width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
+    .btn-settings:hover{border-color:var(--accent2);color:var(--accent2)}
+    .btn-settings svg{width:12px;height:12px}
 
-    #app {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
+    /* PLAYBACK BAR */
+    #playback-bar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);border-top:1px solid var(--border-b);flex-shrink:0;position:relative}
+    #playback-bar::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent4),var(--accent),var(--accent4),transparent);opacity:.35}
+    .now-playing{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+    .np-label{font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:2px}
+    .np-name{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .np-name.idle{color:var(--text-dim)}
+    .transport-btns{display:flex;align-items:center;gap:6px;flex-shrink:0}
+    .btn-transport{background:var(--surface3);border:1px solid var(--border-b);border-radius:8px;color:var(--text);width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
+    .btn-transport:hover{border-color:var(--accent4);color:var(--accent4)}
+    .btn-transport.primary{background:linear-gradient(135deg,var(--accent2),var(--accent));border-color:var(--accent);color:var(--bg);width:46px;height:46px;box-shadow:0 0 16px rgba(125,216,240,.22)}
+    .btn-transport.primary:hover{filter:brightness(1.1);box-shadow:0 0 26px rgba(125,216,240,.38)}
+    .btn-transport svg{width:15px;height:15px}
+    .btn-transport.primary svg{width:19px;height:19px}
+    .progress-section{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+    .progress-bar-wrap{height:6px;background:var(--border-b);border-radius:3px;cursor:pointer;position:relative;overflow:visible}
+    .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent3));border-radius:3px;width:0%;pointer-events:none;position:relative;transition:width .05s linear}
+    .progress-bar-fill::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:11px;height:11px;border-radius:50%;background:var(--accent3);box-shadow:0 0 6px var(--accent);opacity:0;transition:opacity .15s}
+    .progress-bar-wrap:hover .progress-bar-fill::after{opacity:1}
+    .progress-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text-dim)}
 
-    /* ===== HEADER ===== */
-    header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 10px 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .logo {
-      font-family: var(--mono);
-      font-size: 18px;
-      color: var(--accent);
-      text-shadow: 0 0 20px var(--accent);
-      letter-spacing: 4px;
-      flex-shrink: 0;
-    }
-    .logo span { color: var(--accent2); }
-
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-left: auto;
-    }
-
-    /* Master Volume */
-    .vol-section {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 6px 12px;
-    }
-    .vol-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 2px;
-    }
-    .vol-display {
-      font-family: var(--mono);
-      font-size: 14px;
-      color: var(--accent);
-      min-width: 36px;
-      text-align: right;
-    }
-    input[type=range].vol-slider {
-      -webkit-appearance: none;
-      width: 100px;
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    input[type=range].vol-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
-      cursor: pointer;
-    }
-
-    /* Key hints */
-    .key-hints {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .key-hint {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-    kbd {
-      background: var(--surface3);
-      border: 1px solid var(--border-bright);
-      border-radius: 3px;
-      padding: 1px 5px;
-      font-family: var(--mono);
-      font-size: 9px;
-      color: var(--text);
-    }
-
-    /* Import Button */
-    .btn-import {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--accent2);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 7px 14px;
-      font-family: var(--sans);
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: all 0.15s;
-      flex-shrink: 0;
-    }
-    .btn-import:hover { background: #9b4fff; box-shadow: 0 0 16px var(--accent2); }
-    .btn-import svg { width: 14px; height: 14px; }
-
-    /* ===== MAIN LAYOUT ===== */
-    main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    /* ===== PLAYLIST PANEL ===== */
-    #playlist-panel {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 16px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .panel-title {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-dim);
-      letter-spacing: 3px;
-    }
-    .panel-count {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent2);
-    }
-
-    /* Drop zone */
-    #drop-zone {
-      flex: 1;
-      overflow-y: auto;
-      position: relative;
-    }
-    #drop-zone.drag-over::after {
-      content: 'DROP FILES HERE';
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,212,255,0.08);
-      border: 2px dashed var(--accent);
-      font-family: var(--mono);
-      font-size: 18px;
-      color: var(--accent);
-      letter-spacing: 6px;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    /* Empty state */
-    #empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      gap: 16px;
-      color: var(--text-dim);
-    }
-    #empty-state svg { width: 48px; height: 48px; opacity: 0.3; }
-    #empty-state p { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-align: center; line-height: 1.8; }
-
-    /* Scrollbar */
-    #drop-zone::-webkit-scrollbar { width: 4px; }
-    #drop-zone::-webkit-scrollbar-track { background: var(--surface); }
-    #drop-zone::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
-
-    /* SE List */
-    #se-list {
-      list-style: none;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .se-item {
-      display: grid;
-      grid-template-columns: 32px 1fr auto auto auto;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.1s;
-      user-select: none;
-      position: relative;
-    }
-    .se-item:hover { border-color: var(--border-bright); background: var(--surface3); }
-    .se-item.active {
-      border-color: var(--accent);
-      background: var(--active);
-      box-shadow: 0 0 12px rgba(0,212,255,0.1);
-    }
-    .se-item.playing {
-      border-color: var(--accent);
-      background: var(--playing);
-      box-shadow: 0 0 20px rgba(0,212,255,0.15);
-      animation: playingPulse 1.5s ease-in-out infinite;
-    }
-    .se-item.dragging {
-      opacity: 0.4;
-      border-style: dashed;
-    }
-    .se-item.drag-target { border-color: var(--accent2); }
-    @keyframes playingPulse {
-      0%, 100% { box-shadow: 0 0 20px rgba(0,212,255,0.15); }
-      50% { box-shadow: 0 0 30px rgba(0,212,255,0.3); }
-    }
-
-    .se-index {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-dim);
-      text-align: center;
-    }
-    .se-item.active .se-index { color: var(--accent); }
-
-    .se-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      overflow: hidden;
-    }
-    .se-name {
-      font-family: var(--sans);
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-bright);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .se-item.active .se-name { color: var(--accent); }
-    .se-item.playing .se-name { color: var(--accent); }
-    .se-meta {
-      display: flex;
-      gap: 8px;
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-    .se-meta span { display: flex; align-items: center; gap: 3px; }
-
-    .se-waveform {
-      width: 60px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-
-    .se-vol-mini {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      min-width: 32px;
-      text-align: right;
-    }
-
-    .btn-settings {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text-dim);
-      width: 26px;
-      height: 26px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      flex-shrink: 0;
-    }
-    .btn-settings:hover { border-color: var(--accent2); color: var(--accent2); }
-    .btn-settings svg { width: 13px; height: 13px; }
-
-    .drag-handle {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 4px;
-      background: transparent;
-      border-radius: 6px 0 0 6px;
-      cursor: grab;
-      transition: background 0.15s;
-    }
-    .se-item:hover .drag-handle { background: var(--border-bright); }
-    .se-item.active .drag-handle { background: var(--accent); }
-
-    /* Playing wave indicator */
-    .wave-indicator {
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      height: 16px;
-    }
-    .wave-bar {
-      width: 3px;
-      background: var(--accent);
-      border-radius: 1px;
-      animation: waveAnim 0.6s ease-in-out infinite;
-    }
-    .wave-bar:nth-child(2) { animation-delay: 0.1s; }
-    .wave-bar:nth-child(3) { animation-delay: 0.2s; }
-    .wave-bar:nth-child(4) { animation-delay: 0.15s; }
-    @keyframes waveAnim {
-      0%, 100% { height: 4px; }
-      50% { height: 14px; }
-    }
-
-    /* ===== PLAYBACK BAR ===== */
-    #playback-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 20px;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .now-playing {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      min-width: 160px;
-      max-width: 220px;
-    }
-    .np-label {
-      font-family: var(--mono);
-      font-size: 9px;
-      color: var(--text-dim);
-      letter-spacing: 3px;
-    }
-    .np-name {
-      font-family: var(--sans);
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--accent);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .np-name.idle { color: var(--text-dim); }
-
-    .transport-btns {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .btn-transport {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      width: 42px;
-      height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      flex-shrink: 0;
-    }
-    .btn-transport:hover { border-color: var(--accent); color: var(--accent); }
-    .btn-transport.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--bg);
-      width: 52px;
-      height: 52px;
-      box-shadow: 0 0 20px rgba(0,212,255,0.3);
-    }
-    .btn-transport.primary:hover { box-shadow: 0 0 30px rgba(0,212,255,0.5); }
-    .btn-transport svg { width: 18px; height: 18px; }
-    .btn-transport.primary svg { width: 22px; height: 22px; }
-
-    /* Progress bar */
-    .progress-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .progress-bar-wrap {
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      border-radius: 2px;
-      transition: width 0.1s linear;
-      width: 0%;
-    }
-    .progress-times {
-      display: flex;
-      justify-content: space-between;
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-
-    /* Status info */
-    .status-info {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 2px;
-      min-width: 80px;
-    }
-    .status-queue {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-    .status-queue strong { color: var(--accent2); }
-
-    /* ===== SETTINGS MODAL ===== */
-    #modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      backdrop-filter: blur(4px);
-    }
-    #modal-overlay.open { display: flex; }
-
-    #settings-modal {
-      background: var(--surface);
-      border: 1px solid var(--border-bright);
-      border-radius: 12px;
-      width: min(560px, 94vw);
-      max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 0 60px rgba(0,212,255,0.1), 0 0 120px rgba(123,47,255,0.1);
-    }
-    #settings-modal::-webkit-scrollbar { width: 4px; }
-    #settings-modal::-webkit-scrollbar-thumb { background: var(--border-bright); }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    .modal-title {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--accent);
-      letter-spacing: 3px;
-    }
-    .modal-subtitle {
-      font-family: var(--sans);
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-top: 2px;
-      max-width: 300px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .btn-close {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-dim);
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .btn-close:hover { border-color: var(--accent3); color: var(--accent3); }
-
-    .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 20px; }
-
-    .setting-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .setting-group-title {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 3px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 6px;
-    }
-    .setting-row {
-      display: grid;
-      grid-template-columns: 120px 1fr auto;
-      align-items: center;
-      gap: 12px;
-    }
-    .setting-label {
-      font-family: var(--sans);
-      font-size: 13px;
-      color: var(--text);
-    }
-    .setting-value {
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--accent);
-      text-align: right;
-      min-width: 50px;
-    }
-    input[type=range].setting-slider {
-      -webkit-appearance: none;
-      width: 100%;
-      height: 4px;
-      background: var(--border);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    input[type=range].setting-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent2);
-      box-shadow: 0 0 6px var(--accent2);
-      cursor: pointer;
-    }
-    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
-    input[type=checkbox].toggle {
-      -webkit-appearance: none;
-      width: 36px;
-      height: 20px;
-      background: var(--border);
-      border-radius: 10px;
-      position: relative;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    input[type=checkbox].toggle:checked { background: var(--accent2); }
-    input[type=checkbox].toggle::after {
-      content: '';
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 14px;
-      height: 14px;
-      background: white;
-      border-radius: 50%;
-      transition: left 0.2s;
-    }
-    input[type=checkbox].toggle:checked::after { left: 19px; }
-    .toggle-label { font-family: var(--sans); font-size: 12px; color: var(--text-dim); }
-
-    /* EQ Section */
-    .eq-section {
-      display: flex;
-      gap: 16px;
-      align-items: flex-end;
-    }
-    .eq-band {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      flex: 1;
-    }
-    .eq-band-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 1px;
-    }
-    .eq-band-val {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent);
-    }
-    input[type=range].eq-slider {
-      -webkit-appearance: none;
-      writing-mode: vertical-lr;
-      direction: rtl;
-      width: 4px;
-      height: 80px;
-      background: var(--border);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    input[type=range].eq-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent);
-      cursor: pointer;
-    }
-
-    .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      padding: 12px 20px;
-      border-top: 1px solid var(--border);
-    }
-    .btn-action {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      padding: 7px 16px;
-      font-family: var(--sans);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .btn-action:hover { border-color: var(--border-bright); }
-    .btn-action.danger { color: var(--accent3); }
-    .btn-action.danger:hover { border-color: var(--accent3); }
-    .btn-action.primary {
-      background: var(--accent2);
-      border-color: var(--accent2);
-      color: white;
-    }
-    .btn-action.primary:hover { background: #9b4fff; }
-
-    /* Flash on keypress */
-    .key-flash {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 9998;
-      animation: keyFlash 0.3s ease-out forwards;
-    }
-    @keyframes keyFlash {
-      0% { background: rgba(0,212,255,0.08); }
-      100% { background: transparent; }
-    }
-
-    /* Responsive */
-    @media (max-width: 600px) {
-      .key-hints { display: none; }
-      .vol-section { padding: 4px 8px; }
-      input[type=range].vol-slider { width: 70px; }
-      .now-playing { min-width: 100px; }
-    }
+    /* MODALS */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,5,15,.78);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+    .modal-overlay.open{display:flex}
+    .modal-box{background:linear-gradient(160deg,var(--surface) 0%,var(--surface2) 100%);border:1px solid var(--border-ice);border-radius:12px;box-shadow:0 0 50px rgba(0,180,216,.1),0 0 90px rgba(72,202,228,.05)}
+    #settings-modal{width:min(560px,94vw);max-height:90vh;overflow-y:auto}
+    #settings-modal::-webkit-scrollbar{width:4px}
+    #settings-modal::-webkit-scrollbar-thumb{background:var(--border-b)}
+    #keybind-modal{width:min(460px,94vw)}
+    #reset-modal{width:min(360px,94vw)}
+    .modal-header{display:flex;align-items:flex-start;justify-content:space-between;padding:13px 17px;border-bottom:1px solid var(--border)}
+    .modal-title{font-family:var(--title);font-size:11px;color:var(--accent);letter-spacing:2px}
+    .modal-subtitle{font-family:var(--sans);font-size:11px;color:var(--text-dim);margin-top:3px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .btn-close{background:none;border:1px solid var(--border-b);border-radius:5px;color:var(--text-dim);width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0;font-size:12px}
+    .btn-close:hover{border-color:var(--danger);color:var(--danger)}
+    .modal-body{padding:13px 17px;display:flex;flex-direction:column;gap:16px}
+    .setting-group{display:flex;flex-direction:column;gap:8px}
+    .setting-group-title{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:3px;border-bottom:1px solid var(--border);padding-bottom:4px}
+    .setting-row{display:grid;grid-template-columns:110px 1fr 60px;align-items:center;gap:9px}
+    .setting-label{font-family:var(--sans);font-size:12px;color:var(--text)}
+    .setting-value{font-family:var(--mono);font-size:11px;color:var(--accent);text-align:right;cursor:pointer;border-radius:3px;padding:1px 3px;transition:background .12s;min-width:50px}
+    .setting-value:hover{background:var(--surface3)}
+    .setting-value-input{font-family:var(--mono);font-size:11px;color:var(--accent3);background:var(--surface3);border:1px solid var(--accent2);border-radius:3px;padding:1px 3px;width:60px;text-align:right;outline:none}
+    input[type=range].setting-slider{-webkit-appearance:none;width:100%;height:3px;background:var(--border-b);border-radius:2px;outline:none;cursor:pointer}
+    input[type=range].setting-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent2);box-shadow:0 0 5px var(--accent2);cursor:pointer}
+    .toggle-wrap{display:flex;align-items:center;gap:6px}
+    input[type=checkbox].toggle{-webkit-appearance:none;width:32px;height:17px;background:var(--border-b);border-radius:9px;position:relative;cursor:pointer;transition:background .2s}
+    input[type=checkbox].toggle:checked{background:var(--accent2)}
+    input[type=checkbox].toggle::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;background:#fff;border-radius:50%;transition:left .2s}
+    input[type=checkbox].toggle:checked::after{left:17px}
+    .toggle-label{font-family:var(--sans);font-size:11px;color:var(--text-dim)}
+    .eq-section{display:flex;gap:12px;align-items:flex-end;padding:4px 0}
+    .eq-band{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1}
+    .eq-band-label{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px}
+    .eq-band-val{font-family:var(--mono);font-size:10px;color:var(--accent);cursor:pointer;border-radius:3px;padding:1px 3px}
+    .eq-band-val:hover{background:var(--surface3)}
+    input[type=range].eq-slider{-webkit-appearance:none;writing-mode:vertical-lr;direction:rtl;width:3px;height:72px;background:var(--border-b);border-radius:2px;outline:none;cursor:pointer}
+    input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);box-shadow:0 0 5px var(--accent);cursor:pointer}
+    .modal-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 17px;border-top:1px solid var(--border)}
+    .modal-footer-right{display:flex;gap:7px}
+    .btn-action{background:var(--surface3);border:1px solid var(--border-b);border-radius:5px;color:var(--text);padding:5px 13px;font-family:var(--sans);font-size:12px;cursor:pointer;transition:all .12s}
+    .btn-action:hover{border-color:var(--border-ice)}
+    .btn-action.danger{color:var(--danger)}
+    .btn-action.danger:hover{border-color:var(--danger);background:rgba(224,92,122,.08)}
+    .btn-action.primary{background:linear-gradient(135deg,var(--accent2),var(--accent4));border-color:var(--accent2);color:var(--bg)}
+    .btn-action.primary:hover{filter:brightness(1.1)}
+    .btn-action.warn-btn{color:var(--warn);border-color:rgba(255,160,64,.35)}
+    .btn-action.warn-btn:hover{border-color:var(--warn);background:rgba(255,160,64,.08)}
+    .keybind-table{width:100%;border-collapse:collapse}
+    .keybind-table th{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:2px;padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}
+    .keybind-table td{padding:7px 8px;border-bottom:1px solid var(--border);font-family:var(--sans);font-size:12px;color:var(--text)}
+    .keybind-table tr:last-child td{border-bottom:none}
+    .btn-edit-kb{background:none;border:1px solid var(--border-b);border-radius:4px;color:var(--text-dim);padding:2px 8px;font-family:var(--mono);font-size:9px;cursor:pointer;transition:all .12s;margin-left:auto;display:block}
+    .btn-edit-kb:hover{border-color:var(--accent2);color:var(--accent2)}
+    .btn-edit-kb.recording{border-color:var(--danger);color:var(--danger);animation:blinkR .7s ease-in-out infinite}
+    @keyframes blinkR{0%,100%{opacity:1}50%{opacity:.35}}
+    .confirm-msg{font-family:var(--sans);font-size:13px;color:var(--text);line-height:1.7;padding:16px 17px}
+    .key-flash{position:fixed;inset:0;pointer-events:none;z-index:9998;animation:kFlash .22s ease-out forwards}
+    @keyframes kFlash{0%{background:rgba(0,180,216,.07)}100%{background:transparent}}
+    @media(max-width:640px){.key-hints{display:none}.now-playing{width:120px}input[type=range].vol-slider{width:60px}}
   </style>
 </head>
 <body>
 <div id="app">
-  <!-- HEADER -->
   <header>
-    <div class="logo">SE<span>_</span>PLAYER</div>
-
-    <div class="key-hints">
-      <div class="key-hint"><kbd>Enter</kbd><kbd>→</kbd> 再生/次へ</div>
-      <div class="key-hint"><kbd>←</kbd> 前へ</div>
-      <div class="key-hint"><kbd>↑</kbd><kbd>↓</kbd> 音量</div>
+    <div class="logo-block">
+      <span class="logo">🐧 PSEP</span>
+      <span class="logo-ver">v0.2</span>
     </div>
-
-    <div class="header-controls">
+    <div class="key-hints" id="key-hints-bar"></div>
+    <div class="header-right">
       <div class="vol-section">
         <span class="vol-label">VOL</span>
         <input type="range" class="vol-slider" id="master-vol" min="0" max="100" value="80" />
         <span class="vol-display" id="vol-display">80</span>
       </div>
       <button class="btn-import" id="btn-import">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         IMPORT
       </button>
       <input type="file" id="file-input" multiple accept="audio/*" style="display:none" />
+      <button class="btn-reset-all" id="btn-reset-all">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+        RESET ALL
+      </button>
     </div>
   </header>
 
-  <!-- MAIN -->
   <main>
     <div id="playlist-panel">
-      <div class="panel-header">
-        <span class="panel-title">// PLAYLIST</span>
-        <span class="panel-count" id="panel-count">0 FILES</span>
-      </div>
-
+      <div class="panel-header"><span class="panel-title">// PLAYLIST</span></div>
       <div id="drop-zone">
         <div id="empty-state">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          <p>音声ファイルをドロップ<br/>または IMPORT ボタンで追加<br/><br/>MP3 / WAV / OGG / FLAC 対応</p>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <p>音声ファイルをドロップ<br/>または IMPORT で追加<br/><br/>MP3 · WAV · OGG · FLAC 対応</p>
         </div>
         <ul id="se-list"></ul>
       </div>
     </div>
   </main>
 
-  <!-- PLAYBACK BAR -->
   <div id="playback-bar">
     <div class="now-playing">
       <span class="np-label">// NOW PLAYING</span>
       <span class="np-name idle" id="np-name">- - -</span>
     </div>
-
     <div class="transport-btns">
-      <button class="btn-transport" id="btn-prev" title="前へ (←)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="19 20 9 12 19 4 19 20"/>
-          <line x1="5" y1="19" x2="5" y2="5"/>
-        </svg>
+      <button class="btn-transport" id="btn-prev" title="前へ / 巻き戻し">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
       </button>
-      <button class="btn-transport primary" id="btn-play" title="再生 (Enter / →)">
-        <svg viewBox="0 0 24 24" fill="currentColor" id="play-icon">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
+      <button class="btn-transport primary" id="btn-play" title="再生 / 次へ">
+        <svg viewBox="0 0 24 24" id="play-icon-svg" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       </button>
-      <button class="btn-transport" id="btn-stop" title="停止">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-        </svg>
+      <button class="btn-transport" id="btn-stop" title="全停止">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
       </button>
     </div>
-
     <div class="progress-section">
-      <div class="progress-bar-wrap">
+      <div class="progress-bar-wrap" id="progress-wrap">
         <div class="progress-bar-fill" id="progress-fill"></div>
       </div>
       <div class="progress-times">
@@ -851,675 +248,803 @@
         <span id="time-total">0:00</span>
       </div>
     </div>
-
-    <div class="status-info">
-      <span class="status-queue" id="status-queue"><strong>0</strong> / <strong>0</strong></span>
-      <span class="status-queue" style="color:var(--text-dim);font-size:9px;">CURSOR</span>
-    </div>
   </div>
 </div>
 
 <!-- SETTINGS MODAL -->
-<div id="modal-overlay">
-  <div id="settings-modal">
+<div class="modal-overlay" id="settings-overlay">
+  <div class="modal-box" id="settings-modal">
     <div class="modal-header">
-      <div>
-        <div class="modal-title">// SE SETTINGS</div>
-        <div class="modal-subtitle" id="modal-se-name">-</div>
-      </div>
-      <button class="btn-close" id="btn-close-modal">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+      <div><div class="modal-title">SE SETTINGS</div><div class="modal-subtitle" id="modal-se-name">-</div></div>
+      <button class="btn-close" id="btn-close-settings">✕</button>
     </div>
     <div class="modal-body">
-      <!-- Volume -->
       <div class="setting-group">
         <div class="setting-group-title">VOLUME</div>
         <div class="setting-row">
           <span class="setting-label">個別音量</span>
           <input type="range" class="setting-slider" id="s-volume" min="0" max="200" value="100" />
-          <span class="setting-value" id="sv-volume">100%</span>
+          <span class="setting-value" id="sv-volume" data-slider="s-volume" data-fmt="pct">100%</span>
         </div>
       </div>
-      <!-- Delay -->
+      <div class="setting-group">
+        <div class="setting-group-title">PAN</div>
+        <div class="setting-row">
+          <span class="setting-label">パン (L/R)</span>
+          <input type="range" class="setting-slider" id="s-pan" min="-100" max="100" step="1" value="0" />
+          <span class="setting-value" id="sv-pan" data-slider="s-pan" data-fmt="pan">C</span>
+        </div>
+      </div>
       <div class="setting-group">
         <div class="setting-group-title">TIMING</div>
         <div class="setting-row">
           <span class="setting-label">再生遅延</span>
           <input type="range" class="setting-slider" id="s-delay" min="0" max="5000" step="50" value="0" />
-          <span class="setting-value" id="sv-delay">0ms</span>
+          <span class="setting-value" id="sv-delay" data-slider="s-delay" data-fmt="ms">0ms</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">再生速度</span>
+          <input type="range" class="setting-slider" id="s-speed" min="25" max="400" step="5" value="100" />
+          <span class="setting-value" id="sv-speed" data-slider="s-speed" data-fmt="speed">1.00×</span>
         </div>
       </div>
-      <!-- Fade -->
       <div class="setting-group">
         <div class="setting-group-title">FADE</div>
         <div class="setting-row">
           <span class="setting-label">フェードイン</span>
-          <div class="toggle-wrap">
-            <input type="checkbox" class="toggle" id="s-fadein-on" />
-            <span class="toggle-label">有効</span>
-          </div>
-          <span class="setting-value"></span>
+          <div class="toggle-wrap"><input type="checkbox" class="toggle" id="s-fadein-on" /><span class="toggle-label">有効</span></div>
+          <span></span>
         </div>
         <div class="setting-row">
           <span class="setting-label">FI 時間</span>
           <input type="range" class="setting-slider" id="s-fadein" min="0" max="5000" step="50" value="0" />
-          <span class="setting-value" id="sv-fadein">0ms</span>
+          <span class="setting-value" id="sv-fadein" data-slider="s-fadein" data-fmt="ms">0ms</span>
         </div>
         <div class="setting-row">
           <span class="setting-label">フェードアウト</span>
-          <div class="toggle-wrap">
-            <input type="checkbox" class="toggle" id="s-fadeout-on" />
-            <span class="toggle-label">有効</span>
-          </div>
-          <span class="setting-value"></span>
+          <div class="toggle-wrap"><input type="checkbox" class="toggle" id="s-fadeout-on" /><span class="toggle-label">有効</span></div>
+          <span></span>
         </div>
         <div class="setting-row">
           <span class="setting-label">FO 時間</span>
           <input type="range" class="setting-slider" id="s-fadeout" min="0" max="5000" step="50" value="0" />
-          <span class="setting-value" id="sv-fadeout">0ms</span>
+          <span class="setting-value" id="sv-fadeout" data-slider="s-fadeout" data-fmt="ms">0ms</span>
         </div>
       </div>
-      <!-- EQ -->
       <div class="setting-group">
-        <div class="setting-group-title">EQUALIZER</div>
+        <div class="setting-group-title">EQUALIZER (dB)</div>
         <div class="eq-section">
           <div class="eq-band">
-            <span class="eq-band-val" id="sv-eq-low">0</span>
+            <span class="eq-band-val" id="sv-eq-low" data-slider="s-eq-low" data-fmt="db">0</span>
             <input type="range" class="eq-slider" id="s-eq-low" min="-12" max="12" step="0.5" value="0" />
-            <span class="eq-band-label">LOW</span>
-            <span class="eq-band-label">200Hz</span>
+            <span class="eq-band-label">LOW</span><span class="eq-band-label">200Hz</span>
           </div>
           <div class="eq-band">
-            <span class="eq-band-val" id="sv-eq-mid">0</span>
+            <span class="eq-band-val" id="sv-eq-mid" data-slider="s-eq-mid" data-fmt="db">0</span>
             <input type="range" class="eq-slider" id="s-eq-mid" min="-12" max="12" step="0.5" value="0" />
-            <span class="eq-band-label">MID</span>
-            <span class="eq-band-label">1kHz</span>
+            <span class="eq-band-label">MID</span><span class="eq-band-label">1kHz</span>
           </div>
           <div class="eq-band">
-            <span class="eq-band-val" id="sv-eq-high">0</span>
+            <span class="eq-band-val" id="sv-eq-high" data-slider="s-eq-high" data-fmt="db">0</span>
             <input type="range" class="eq-slider" id="s-eq-high" min="-12" max="12" step="0.5" value="0" />
-            <span class="eq-band-label">HIGH</span>
-            <span class="eq-band-label">5kHz</span>
+            <span class="eq-band-label">HIGH</span><span class="eq-band-label">5kHz</span>
           </div>
         </div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:4px;">※ dB単位 (-12 〜 +12)</div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-action danger" id="btn-remove-se">削除</button>
-      <button class="btn-action" id="btn-close-modal2">キャンセル</button>
-      <button class="btn-action primary" id="btn-save-settings">適用</button>
+      <div class="modal-footer-right">
+        <button class="btn-action warn-btn" id="btn-reset-settings">リセット</button>
+        <button class="btn-action" id="btn-close-settings2">キャンセル</button>
+        <button class="btn-action primary" id="btn-save-settings">適用</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KEYBIND MODAL -->
+<div class="modal-overlay" id="keybind-overlay">
+  <div class="modal-box" id="keybind-modal">
+    <div class="modal-header">
+      <div><div class="modal-title">KEYBIND SETTINGS</div><div class="modal-subtitle">操作キーを変更できます (ESCでキャンセル)</div></div>
+      <button class="btn-close" id="btn-close-keybind">✕</button>
+    </div>
+    <div class="modal-body" style="padding-top:6px">
+      <table class="keybind-table" id="keybind-table"></table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action warn-btn" id="btn-reset-keybinds">デフォルトに戻す</button>
+      <div class="modal-footer-right"><button class="btn-action primary" id="btn-close-keybind2">閉じる</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESET CONFIRM MODAL -->
+<div class="modal-overlay" id="reset-overlay">
+  <div class="modal-box" id="reset-modal">
+    <div class="modal-header">
+      <div><div class="modal-title" style="color:var(--danger)">RESET ALL DATA</div></div>
+      <button class="btn-close" id="btn-close-reset">✕</button>
+    </div>
+    <div class="confirm-msg">すべての音声データと設定を削除します。<br/>この操作は取り消せません。本当に削除しますか？</div>
+    <div class="modal-footer">
+      <button class="btn-action" id="btn-cancel-reset">キャンセル</button>
+      <div class="modal-footer-right"><button class="btn-action danger" id="btn-confirm-reset">すべて削除する</button></div>
     </div>
   </div>
 </div>
 
 <script>
-// ===========================
-// SE PLAYER - Main Application
-// ===========================
+// =============================================
+// PenguinSoundEffectPlayer  v0.2
+// =============================================
 
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
+// ===== IndexedDB =====
+const DB_NAME = 'psep_v2';
+const DB_VER  = 1;
+let db = null;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('audio_files'))
+        d.createObjectStore('audio_files', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('app_settings'))
+        d.createObjectStore('app_settings', { keyPath: 'key' });
+    };
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+const tx = (store, mode='readonly') => db.transaction(store, mode).objectStore(store);
+const dbPut = (s,v)   => new Promise((res,rej) => { const r=tx(s,'readwrite').put(v); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); });
+const dbGet = (s,k)   => new Promise((res,rej) => { const r=tx(s).get(k); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+const dbAll = (s)     => new Promise((res,rej) => { const r=tx(s).getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+const dbDel = (s,k)   => new Promise((res,rej) => { const r=tx(s,'readwrite').delete(k); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); });
+const dbClear = (s)   => new Promise((res,rej) => { const r=tx(s,'readwrite').clear(); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error); });
+
+// ===== Audio =====
+const AC = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
-
-function ensureAudioCtx() {
-  if (!audioCtx) audioCtx = new AudioCtx();
+function ensureCtx() {
+  if (!audioCtx) audioCtx = new AC();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
 
-// ===== STATE =====
-let seList = [];       // { id, name, buffer, duration, settings }
-let cursor = 0;        // current position in list
-let currentSource = null;
-let currentGain = null;
-let isPlaying = false;
+// ===== State =====
+let seList = [];
+let cursor = 0;
+// activeSources: [{source, gain, pan, idx, seId, startAt, duration}]
+let activeSources = [];
 let progressTimer = null;
-let playStartTime = 0;
-let playOffset = 0;
-let editingIndex = null;
+let editingIdx = null;
+const masterVol = { v: 0.8 };
 
-const masterVol = { value: 0.8 };
-
-// Default settings per SE
 function defaultSettings() {
-  return {
-    volume: 1.0,
-    delay: 0,
-    fadeIn: false,
-    fadeInTime: 0,
-    fadeOut: false,
-    fadeOutTime: 0,
-    eqLow: 0,
-    eqMid: 0,
-    eqHigh: 0,
-  };
+  return { volume:1, pan:0, delay:0, speed:1, fadeIn:false, fadeInTime:0, fadeOut:false, fadeOutTime:0, eqLow:0, eqMid:0, eqHigh:0 };
 }
 
-// ===== DOM refs =====
-const $list     = document.getElementById('se-list');
-const $empty    = document.getElementById('empty-state');
-const $count    = document.getElementById('panel-count');
-const $npName   = document.getElementById('np-name');
-const $btnPlay  = document.getElementById('btn-play');
-const $btnPrev  = document.getElementById('btn-prev');
-const $btnStop  = document.getElementById('btn-stop');
-const $progress = document.getElementById('progress-fill');
-const $timeCur  = document.getElementById('time-current');
-const $timeTotal= document.getElementById('time-total');
-const $statusQ  = document.getElementById('status-queue');
-const $volSlider= document.getElementById('master-vol');
-const $volDisp  = document.getElementById('vol-display');
-const $dropZone = document.getElementById('drop-zone');
-const $fileInput= document.getElementById('file-input');
-const $btnImport= document.getElementById('btn-import');
-const $modal    = document.getElementById('modal-overlay');
-const $modalName= document.getElementById('modal-se-name');
+// ===== Keybinds =====
+const KB_DEFAULT = { play:['Enter','ArrowRight'], prev:['ArrowLeft'], volUp:['ArrowUp'], volDown:['ArrowDown'] };
+const KB_LABELS  = { play:'再生 / 次へ', prev:'前へ / 巻き戻し', volUp:'音量 +5', volDown:'音量 −5' };
+let kb = JSON.parse(JSON.stringify(KB_DEFAULT));
+function loadKB() { try { const s=localStorage.getItem('psep_kb'); if(s) kb=JSON.parse(s); } catch{} }
+function saveKB() { localStorage.setItem('psep_kb', JSON.stringify(kb)); }
+function kbMatch(action, e) { return (kb[action]||[]).includes(e.key); }
+function kbLabel(k) { return ({ArrowRight:'→',ArrowLeft:'←',ArrowUp:'↑',ArrowDown:'↓',Enter:'Enter',' ':'Space'})[k]||k; }
 
-// ===== AUDIO DECODE =====
-async function decodeFile(file) {
-  const ab = await file.arrayBuffer();
-  const ctx = ensureAudioCtx();
-  return await ctx.decodeAudioData(ab);
+// ===== DOM =====
+const $list   = document.getElementById('se-list');
+const $empty  = document.getElementById('empty-state');
+const $npName = document.getElementById('np-name');
+const $fill   = document.getElementById('progress-fill');
+const $wrap   = document.getElementById('progress-wrap');
+const $tCur   = document.getElementById('time-current');
+const $tTot   = document.getElementById('time-total');
+const $volSl  = document.getElementById('master-vol');
+const $volDp  = document.getElementById('vol-display');
+const $drop   = document.getElementById('drop-zone');
+const $fInput = document.getElementById('file-input');
+const $settOv = document.getElementById('settings-overlay');
+const $kbOv   = document.getElementById('keybind-overlay');
+const $rstOv  = document.getElementById('reset-overlay');
+const $hints  = document.getElementById('key-hints-bar');
+
+// ===== Key hints =====
+function renderHints() {
+  $hints.innerHTML = '';
+  ['play','prev','volUp','volDown'].forEach(action => {
+    const div = document.createElement('div');
+    div.className = 'key-hint';
+    div.title = 'クリックでキーバインド変更';
+    div.innerHTML = (kb[action]||[]).map(k=>`<kbd>${kbLabel(k)}</kbd>`).join('') + ' ' + KB_LABELS[action];
+    div.onclick = openKbModal;
+    $hints.appendChild(div);
+  });
 }
 
-// ===== IMPORT FILES =====
+// ===== Import =====
 async function importFiles(files) {
-  const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(f.name));
-  if (audioFiles.length === 0) return;
-
-  for (const file of audioFiles) {
+  const audios = Array.from(files).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(f.name));
+  if (!audios.length) return;
+  const ctx = ensureCtx();
+  for (const file of audios) {
     try {
-      ensureAudioCtx();
-      const buffer = await decodeFile(file);
-      seList.push({
-        id: Date.now() + Math.random(),
-        name: file.name.replace(/\.[^.]+$/, ''),
-        fullName: file.name,
-        buffer,
-        duration: buffer.duration,
-        settings: defaultSettings(),
-      });
-    } catch (e) {
-      console.warn('Failed to decode:', file.name, e);
-    }
+      const ab = await file.arrayBuffer();
+      const abSave = ab.slice(0);
+      const buf = await ctx.decodeAudioData(ab);
+      const wf  = buildWF(buf, 30);
+      const id  = 'se_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const se  = { id, name: file.name.replace(/\.[^.]+$/,''), fullName: file.name,
+                    ab: abSave, wf, duration: buf.duration,
+                    settings: defaultSettings(), buffer: buf };
+      seList.push(se);
+      await dbPut('audio_files', { id, name:se.name, fullName:se.fullName, ab:abSave, wf, duration:buf.duration, settings:se.settings, order: seList.length-1 });
+    } catch(err) { console.warn('Decode failed', file.name, err); }
   }
+  await saveOrder();
   renderList();
-  updateStatus();
 }
 
-// ===== RENDER LIST =====
+function buildWF(buf, n) {
+  const d = buf.getChannelData(0), step = Math.floor(d.length/n), out=[];
+  for (let i=0;i<n;i++) { let m=0; for(let j=0;j<step;j++) m=Math.max(m,Math.abs(d[i*step+j]||0)); out.push(m); }
+  return out;
+}
+
+async function saveOrder() {
+  await dbPut('app_settings', { key:'cursor', value:cursor });
+  await dbPut('app_settings', { key:'order', value: seList.map((s,i)=>({id:s.id,order:i})) });
+}
+
+async function saveSeSettings() {
+  for (const se of seList) {
+    const row = await dbGet('audio_files', se.id);
+    if (row) { row.settings = se.settings; await dbPut('audio_files', row); }
+  }
+}
+
+// ===== Load from DB =====
+async function loadDB() {
+  const rows = await dbAll('audio_files');
+  if (!rows.length) return;
+  const ctx = ensureCtx();
+  const orderRow = await dbGet('app_settings','order');
+  const om = {};
+  if (orderRow) orderRow.value.forEach(({id,order})=>om[id]=order);
+  rows.sort((a,b)=>(om[a.id]??999)-(om[b.id]??999));
+  for (const row of rows) {
+    try {
+      const abSave = row.ab.slice(0);
+      const buf = await ctx.decodeAudioData(row.ab);
+      seList.push({ id:row.id, name:row.name, fullName:row.fullName,
+                    ab:abSave, wf:row.wf||buildWF(buf,30),
+                    duration:buf.duration, settings:row.settings||defaultSettings(), buffer:buf });
+    } catch(e) { console.warn('Load failed',row.name,e); }
+  }
+  const cr = await dbGet('app_settings','cursor');
+  if (cr) cursor = Math.min(cr.value, Math.max(0, seList.length-1));
+  renderList();
+  updateNP();
+}
+
+// ===== Render =====
 function renderList() {
   $empty.style.display = seList.length ? 'none' : 'flex';
-  $count.textContent = seList.length + ' FILES';
-
   $list.innerHTML = '';
   seList.forEach((se, i) => {
     const li = document.createElement('li');
-    li.className = 'se-item' + (i === cursor ? ' active' : '');
+    li.className = 'se-item' + (i===cursor?' active':'');
+    if (activeSources.some(s=>s.seId===se.id)) li.classList.add('playing');
     li.dataset.index = i;
     li.draggable = true;
-
-    const waveHtml = generateMiniWave(se.buffer);
-
     li.innerHTML = `
       <div class="drag-handle"></div>
       <span class="se-index">${String(i+1).padStart(2,'0')}</span>
       <div class="se-info">
-        <span class="se-name">${escHtml(se.name)}</span>
+        <span class="se-name">${esc(se.name)}</span>
         <div class="se-meta">
-          <span>${fmtTime(se.duration)}</span>
-          ${se.settings.delay > 0 ? `<span>⏱ ${se.settings.delay}ms</span>` : ''}
-          ${se.settings.fadeIn ? '<span>FI</span>' : ''}
-          ${se.settings.fadeOut ? '<span>FO</span>' : ''}
+          <span>${fmtT(se.duration)}</span>
+          ${se.settings.delay>0?`<span>⏱${se.settings.delay}ms</span>`:''}
+          ${se.settings.speed!==1?`<span>×${se.settings.speed.toFixed(2)}</span>`:''}
+          ${se.settings.pan!==0?`<span>${se.settings.pan<0?'L':'R'}${Math.abs(se.settings.pan)}</span>`:''}
+          ${se.settings.fadeIn?'<span>FI</span>':''}
+          ${se.settings.fadeOut?'<span>FO</span>':''}
         </div>
       </div>
-      ${waveHtml}
-      <span class="se-vol-mini">${Math.round(se.settings.volume * 100)}%</span>
-      <button class="btn-settings" data-index="${i}" title="設定">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/>
-        </svg>
-      </button>
-    `;
+      ${wfSvg(se.wf)}
+      <button class="btn-settings" data-index="${i}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
+      </button>`;
 
-    // Click to select
-    li.addEventListener('click', (e) => {
-      if (e.target.closest('.btn-settings')) return;
+    // Click: select + play
+    li.addEventListener('click', e => {
+      if (e.target.closest('.btn-settings') || e.target.closest('.drag-handle')) return;
       cursor = i;
+      playIdx(i);
       renderList();
-      updateStatus();
     });
 
-    // Settings button
-    li.querySelector('.btn-settings').addEventListener('click', (e) => {
+    li.querySelector('.btn-settings').addEventListener('click', e => {
       e.stopPropagation();
       openSettings(i);
     });
 
-    // Drag & Drop
-    li.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', i);
-      li.classList.add('dragging');
-    });
-    li.addEventListener('dragend', () => li.classList.remove('dragging'));
-    li.addEventListener('dragover', (e) => {
+    // Drag
+    li.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(i)); li.classList.add('dragging'); });
+    li.addEventListener('dragend', () => { li.classList.remove('dragging'); $list.querySelectorAll('.se-item').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom')); });
+    li.addEventListener('dragover', e => {
       e.preventDefault();
-      li.classList.add('drag-target');
+      $list.querySelectorAll('.se-item').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+      const mid = li.getBoundingClientRect().top + li.getBoundingClientRect().height/2;
+      li.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
     });
-    li.addEventListener('dragleave', () => li.classList.remove('drag-target'));
-    li.addEventListener('drop', (e) => {
+    li.addEventListener('dragleave', () => li.classList.remove('drag-over-top','drag-over-bottom'));
+    li.addEventListener('drop', async e => {
       e.preventDefault();
-      li.classList.remove('drag-target');
+      li.classList.remove('drag-over-top','drag-over-bottom');
       const from = parseInt(e.dataTransfer.getData('text/plain'));
-      const to = i;
-      if (from !== to) {
-        const moved = seList.splice(from, 1)[0];
-        seList.splice(to, 0, moved);
-        // Adjust cursor
-        if (cursor === from) cursor = to;
-        else if (cursor > from && cursor <= to) cursor--;
-        else if (cursor < from && cursor >= to) cursor++;
-        renderList();
-        updateStatus();
-      }
+      const mid  = li.getBoundingClientRect().top + li.getBoundingClientRect().height/2;
+      let to = e.clientY < mid ? i : i+1;
+      if (from===to || from===to-1) return;
+      const moved = seList.splice(from, 1)[0];
+      const ins   = from < to ? to-1 : to;
+      seList.splice(ins, 0, moved);
+      if (cursor===from) cursor=ins;
+      else if (from<cursor && cursor<=ins) cursor--;
+      else if (ins<=cursor && cursor<from) cursor++;
+      await saveOrder();
+      renderList();
     });
 
     $list.appendChild(li);
   });
 
-  // Update playing state
-  if (isPlaying) markPlaying(cursor);
-
-  // Scroll active item into view
-  const activeEl = $list.querySelector('.se-item.active');
-  if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const active = $list.querySelector('.se-item.active');
+  if (active) active.scrollIntoView({ block:'nearest', behavior:'smooth' });
 }
 
-function generateMiniWave(buffer) {
-  const data = buffer.getChannelData(0);
-  const samples = 30;
-  const step = Math.floor(data.length / samples);
-  let bars = '';
-  for (let i = 0; i < samples; i++) {
-    let max = 0;
-    for (let j = 0; j < step; j++) max = Math.max(max, Math.abs(data[i * step + j] || 0));
-    const h = Math.max(2, Math.round(max * 18));
-    bars += `<rect x="${i * 2}" y="${(20-h)/2}" width="1.5" height="${h}" rx="0.5" fill="var(--border-bright)"/>`;
+function wfSvg(data) {
+  if (!data||!data.length) return '<svg class="se-waveform" viewBox="0 0 54 18"></svg>';
+  const n=data.length, w=54/n;
+  let bars='';
+  for (let i=0;i<n;i++) {
+    const h=Math.max(2,Math.round(data[i]*16));
+    bars+=`<rect x="${i*w}" y="${(18-h)/2}" width="${w-1}" height="${h}" rx="0.5" fill="var(--border-ice)"/>`;
   }
-  return `<svg class="se-waveform" viewBox="0 0 60 20" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
+  return `<svg class="se-waveform" viewBox="0 0 54 18">${bars}</svg>`;
 }
 
-function markPlaying(idx) {
-  document.querySelectorAll('.se-item').forEach((el, i) => {
-    el.classList.remove('playing');
-    if (i === idx) el.classList.add('playing');
-  });
-}
+// ===== Play =====
+async function playIdx(idx) {
+  if (idx<0||idx>=seList.length) return;
+  const se = seList[idx];
+  const s  = se.settings;
+  const ctx = ensureCtx();
 
-// ===== PLAY ENGINE =====
-async function playCurrentSE() {
-  if (seList.length === 0) return;
+  let buf = se.buffer;
+  if (!buf) { buf = await ctx.decodeAudioData(se.ab.slice(0)); se.buffer = buf; }
 
-  const se = seList[cursor];
-  const settings = se.settings;
-
-  stopCurrent(false);
-
-  const ctx = ensureAudioCtx();
-
-  // Build audio graph: source → gain (individual) → EQ → masterGain → destination
   const source = ctx.createBufferSource();
-  source.buffer = se.buffer;
+  source.buffer = buf;
+  source.playbackRate.value = s.speed;
 
   const gainNode = ctx.createGain();
-  gainNode.gain.value = settings.volume * masterVol.value;
+  gainNode.gain.value = s.volume * masterVol.v;
 
-  // EQ filters
-  const lowFilter = ctx.createBiquadFilter();
-  lowFilter.type = 'lowshelf';
-  lowFilter.frequency.value = 200;
-  lowFilter.gain.value = settings.eqLow;
+  const panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if (panNode) panNode.pan.value = s.pan/100;
 
-  const midFilter = ctx.createBiquadFilter();
-  midFilter.type = 'peaking';
-  midFilter.frequency.value = 1000;
-  midFilter.Q.value = 1;
-  midFilter.gain.value = settings.eqMid;
+  const low = ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=200; low.gain.value=s.eqLow;
+  const mid = ctx.createBiquadFilter(); mid.type='peaking';  mid.frequency.value=1000; mid.Q.value=1; mid.gain.value=s.eqMid;
+  const hi  = ctx.createBiquadFilter(); hi.type='highshelf'; hi.frequency.value=5000; hi.gain.value=s.eqHigh;
 
-  const highFilter = ctx.createBiquadFilter();
-  highFilter.type = 'highshelf';
-  highFilter.frequency.value = 5000;
-  highFilter.gain.value = settings.eqHigh;
+  source.connect(gainNode); gainNode.connect(low); low.connect(mid); mid.connect(hi);
+  if (panNode) { hi.connect(panNode); panNode.connect(ctx.destination); }
+  else hi.connect(ctx.destination);
 
-  source.connect(gainNode);
-  gainNode.connect(lowFilter);
-  lowFilter.connect(midFilter);
-  midFilter.connect(highFilter);
-  highFilter.connect(ctx.destination);
+  const now   = ctx.currentTime;
+  const delay = s.delay/1000;
+  const dur   = buf.duration/s.speed;
 
-  currentSource = source;
-  currentGain = gainNode;
-
-  const now = ctx.currentTime;
-  const delay = settings.delay / 1000;
-  const duration = se.duration;
-
-  // Fade in
-  if (settings.fadeIn && settings.fadeInTime > 0) {
-    const fi = settings.fadeInTime / 1000;
-    gainNode.gain.setValueAtTime(0, now + delay);
-    gainNode.gain.linearRampToValueAtTime(settings.volume * masterVol.value, now + delay + fi);
+  if (s.fadeIn && s.fadeInTime>0) {
+    const fi = s.fadeInTime/1000;
+    gainNode.gain.setValueAtTime(0, now+delay);
+    gainNode.gain.linearRampToValueAtTime(s.volume*masterVol.v, now+delay+fi);
   }
-
-  // Fade out
-  if (settings.fadeOut && settings.fadeOutTime > 0) {
-    const fo = settings.fadeOutTime / 1000;
-    const foStart = now + delay + duration - fo;
-    if (foStart > now + delay) {
-      gainNode.gain.setValueAtTime(settings.volume * masterVol.value, foStart);
-      gainNode.gain.linearRampToValueAtTime(0, now + delay + duration);
+  if (s.fadeOut && s.fadeOutTime>0) {
+    const fo = s.fadeOutTime/1000;
+    const fs = now+delay+dur-fo;
+    if (fs>now+delay) {
+      gainNode.gain.setValueAtTime(s.volume*masterVol.v, fs);
+      gainNode.gain.linearRampToValueAtTime(0, now+delay+dur);
     }
   }
 
-  source.start(now + delay);
-  playStartTime = ctx.currentTime + delay;
-  playOffset = 0;
-  isPlaying = true;
+  source.start(now+delay);
 
-  // UI
-  $npName.textContent = se.name;
-  $npName.classList.remove('idle');
-  $timeTotal.textContent = fmtTime(duration);
-  setPlayIcon(true);
-  markPlaying(cursor);
-  renderList();
-
-  // Progress
-  clearInterval(progressTimer);
-  progressTimer = setInterval(() => updateProgress(se.duration), 100);
+  const entry = { source, gainNode, panNode, idx, seId:se.id, startAt:now+delay, duration:dur };
+  activeSources.push(entry);
 
   source.onended = () => {
-    if (source === currentSource) {
-      isPlaying = false;
-      clearInterval(progressTimer);
-      setPlayIcon(false);
-      document.querySelectorAll('.se-item').forEach(el => el.classList.remove('playing'));
-      $progress.style.width = '0%';
-      $timeCur.textContent = '0:00';
-      // Auto-advance cursor
-      if (cursor < seList.length - 1) cursor++;
-      renderList();
-      updateStatus();
+    const j = activeSources.indexOf(entry);
+    if (j!==-1) activeSources.splice(j,1);
+    if (entry.idx===cursor && !activeSources.some(en=>en.idx===cursor)) {
+      if (cursor<seList.length-1) cursor++;
     }
+    renderList(); updateNP();
+    if (!activeSources.length) { clearInterval(progressTimer); $fill.style.width='0%'; $tCur.textContent='0:00'; }
   };
 
-  // Flash
+  renderList(); updateNP(); startProgress();
   flashScreen();
 }
 
-function stopCurrent(resetCursor = false) {
-  if (currentSource) {
-    try { currentSource.stop(); } catch (e) {}
-    currentSource = null;
-    currentGain = null;
-  }
+function stopAll() {
+  activeSources.forEach(e=>{ try{e.source.stop()}catch{} });
+  activeSources=[];
   clearInterval(progressTimer);
-  isPlaying = false;
-  setPlayIcon(false);
-  document.querySelectorAll('.se-item').forEach(el => el.classList.remove('playing'));
-  $progress.style.width = '0%';
-  $timeCur.textContent = '0:00';
-  if (resetCursor) {
+  $fill.style.width='0%'; $tCur.textContent='0:00';
+  renderList(); updateNP();
+}
+
+function stopIdx(idx) {
+  activeSources.filter(e=>e.idx===idx).forEach(e=>{ try{e.source.stop()}catch{} });
+}
+
+function seekCursor(pct) {
+  const entries = activeSources.filter(e=>e.idx===cursor);
+  if (!entries.length) return;
+  const entry = entries[entries.length-1];
+  const se = seList[cursor];
+  if (!se||!se.buffer) return;
+  const newOffset = pct * entry.duration;
+
+  try { entry.source.stop(); } catch{}
+  const j = activeSources.indexOf(entry);
+  if (j!==-1) activeSources.splice(j,1);
+
+  const ctx = ensureCtx();
+  const s   = se.settings;
+  const source = ctx.createBufferSource();
+  source.buffer = se.buffer;
+  source.playbackRate.value = s.speed;
+
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = s.volume * masterVol.v;
+  const panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if (panNode) panNode.pan.value = s.pan/100;
+  const low = ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=200; low.gain.value=s.eqLow;
+  const mid = ctx.createBiquadFilter(); mid.type='peaking';  mid.frequency.value=1000; mid.Q.value=1; mid.gain.value=s.eqMid;
+  const hi  = ctx.createBiquadFilter(); hi.type='highshelf'; hi.frequency.value=5000; hi.gain.value=s.eqHigh;
+  source.connect(gainNode); gainNode.connect(low); low.connect(mid); mid.connect(hi);
+  if (panNode) { hi.connect(panNode); panNode.connect(ctx.destination); } else hi.connect(ctx.destination);
+
+  const now = ctx.currentTime;
+  source.start(now, newOffset*s.speed);
+  const ne = { source, gainNode, panNode, idx:cursor, seId:se.id, startAt:now-newOffset, duration:entry.duration };
+  activeSources.push(ne);
+
+  source.onended = () => {
+    const k = activeSources.indexOf(ne);
+    if (k!==-1) activeSources.splice(k,1);
+    if (ne.idx===cursor && !activeSources.some(en=>en.idx===cursor)) {
+      if (cursor<seList.length-1) cursor++;
+    }
+    renderList(); updateNP();
+    if (!activeSources.length) { clearInterval(progressTimer); $fill.style.width='0%'; $tCur.textContent='0:00'; }
+  };
+}
+
+function startProgress() {
+  clearInterval(progressTimer);
+  progressTimer = setInterval(()=>{
+    const en = activeSources.filter(e=>e.idx===cursor);
+    if (!en.length||!audioCtx) return;
+    const e = en[en.length-1];
+    const elapsed = audioCtx.currentTime - e.startAt;
+    $fill.style.width = Math.min(100,(elapsed/e.duration)*100)+'%';
+    $tCur.textContent = fmtT(Math.max(0,elapsed));
+    $tTot.textContent = fmtT(e.duration);
+  }, 80);
+}
+
+function updateNP() {
+  const en = activeSources.filter(e=>e.idx===cursor);
+  const se = seList[cursor];
+  if (se) {
+    $npName.textContent = se.name;
+    $npName.classList.remove('idle');
+    if (!en.length) $tTot.textContent = fmtT(se.duration);
+  } else {
     $npName.textContent = '- - -';
     $npName.classList.add('idle');
+    $tTot.textContent = '0:00';
   }
 }
 
-function updateProgress(duration) {
-  if (!audioCtx || !isPlaying) return;
-  const elapsed = audioCtx.currentTime - playStartTime;
-  const pct = Math.min(100, (elapsed / duration) * 100);
-  $progress.style.width = pct + '%';
-  $timeCur.textContent = fmtTime(Math.max(0, elapsed));
-}
+// ===== Keyboard =====
+let prevPressedOnce = false;
 
-// ===== KEYBOARD HANDLER =====
-document.addEventListener('keydown', handleKey);
-
-function handleKey(e) {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if ($modal.classList.contains('open')) return;
-
-  if (e.key === 'Enter' || e.key === 'ArrowRight') {
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if (document.querySelector('.modal-overlay.open')) return;
+  if (kbMatch('play',e)) {
     e.preventDefault();
-    if (isPlaying) {
-      stopCurrent(false);
-      if (cursor < seList.length - 1) cursor++;
-      else cursor = seList.length - 1;
-      renderList();
-      updateStatus();
-      playCurrentSE();
+    playIdx(cursor);
+    if (cursor<seList.length-1) cursor++;
+    prevPressedOnce = false;
+    renderList();
+  } else if (kbMatch('prev',e)) {
+    e.preventDefault();
+    const playing = activeSources.filter(en=>en.idx===cursor);
+    if (playing.length && !prevPressedOnce) {
+      seekCursor(0);
+      prevPressedOnce = true;
     } else {
-      playCurrentSE();
+      stopIdx(cursor);
+      if (cursor>0) cursor--;
+      prevPressedOnce = false;
+      renderList(); updateNP();
     }
-  } else if (e.key === 'ArrowLeft') {
+  } else if (kbMatch('volUp',e)) {
     e.preventDefault();
-    stopCurrent(false);
-    if (cursor > 0) cursor--;
-    renderList();
-    updateStatus();
-  } else if (e.key === 'ArrowUp') {
+    setVol(Math.min(100, parseInt($volSl.value)+5));
+  } else if (kbMatch('volDown',e)) {
     e.preventDefault();
-    setMasterVolume(Math.min(100, parseInt($volSlider.value) + 5));
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    setMasterVolume(Math.max(0, parseInt($volSlider.value) - 5));
-  }
-}
+    setVol(Math.max(0, parseInt($volSl.value)-5));
+  } else { prevPressedOnce = false; }
+});
 
-// ===== TRANSPORT BUTTONS =====
-$btnPlay.addEventListener('click', () => {
-  if (isPlaying) {
-    stopCurrent(false);
-    if (cursor < seList.length - 1) cursor++;
-    renderList();
-    updateStatus();
-    playCurrentSE();
+// ===== Transport =====
+document.getElementById('btn-play').addEventListener('click', ()=>{
+  playIdx(cursor);
+  if (cursor<seList.length-1) cursor++;
+  prevPressedOnce = false;
+  renderList();
+});
+document.getElementById('btn-prev').addEventListener('click', ()=>{
+  const playing = activeSources.filter(en=>en.idx===cursor);
+  if (playing.length && !prevPressedOnce) {
+    seekCursor(0);
+    prevPressedOnce = true;
   } else {
-    playCurrentSE();
+    stopIdx(cursor);
+    if (cursor>0) cursor--;
+    prevPressedOnce = false;
+    renderList(); updateNP();
   }
 });
+document.getElementById('btn-stop').addEventListener('click', stopAll);
 
-$btnPrev.addEventListener('click', () => {
-  stopCurrent(false);
-  if (cursor > 0) cursor--;
-  renderList();
-  updateStatus();
+// ===== Seekbar =====
+let seeking = false;
+function seekPct(e) {
+  const r = $wrap.getBoundingClientRect();
+  return Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
+}
+$wrap.addEventListener('mousedown', e => {
+  seeking = true;
+  $fill.style.width = seekPct(e)*100+'%';
+});
+document.addEventListener('mousemove', e => {
+  if (!seeking) return;
+  $fill.style.width = seekPct(e)*100+'%';
+});
+document.addEventListener('mouseup', e => {
+  if (!seeking) return;
+  seeking = false;
+  const p = seekPct(e);
+  if (activeSources.some(en=>en.idx===cursor)) seekCursor(p);
+  else if (seList[cursor]) $tCur.textContent = fmtT(p*seList[cursor].duration);
 });
 
-$btnStop.addEventListener('click', () => {
-  stopCurrent(true);
-  renderList();
-  updateStatus();
-});
+// ===== Master Volume =====
+function setVol(val) {
+  $volSl.value = val; masterVol.v = val/100; $volDp.textContent = val;
+  activeSources.forEach(en => {
+    const se = seList.find(s=>s.id===en.seId);
+    if (se) { en.gainNode.gain.cancelScheduledValues(audioCtx.currentTime); en.gainNode.gain.value = se.settings.volume*masterVol.v; }
+  });
+}
+$volSl.addEventListener('input', ()=>setVol(parseInt($volSl.value)));
 
-// ===== MASTER VOLUME =====
-function setMasterVolume(val) {
-  $volSlider.value = val;
-  masterVol.value = val / 100;
-  $volDisp.textContent = val;
-  if (currentGain && isPlaying) {
-    const se = seList[cursor];
-    currentGain.gain.cancelScheduledValues(0);
-    currentGain.gain.value = se.settings.volume * masterVol.value;
-  }
+// ===== File import =====
+document.getElementById('btn-import').addEventListener('click', ()=>{ ensureCtx(); $fInput.click(); });
+$fInput.addEventListener('change', ()=>{ importFiles($fInput.files); $fInput.value=''; });
+$drop.addEventListener('dragover', e=>{ e.preventDefault(); if(e.dataTransfer.types.includes('Files')) $drop.classList.add('drag-over'); });
+$drop.addEventListener('dragleave', e=>{ if(!$drop.contains(e.relatedTarget)) $drop.classList.remove('drag-over'); });
+$drop.addEventListener('drop', e=>{ e.preventDefault(); $drop.classList.remove('drag-over'); if(e.dataTransfer.files.length){ ensureCtx(); importFiles(e.dataTransfer.files); } });
+
+// ===== Reset All =====
+document.getElementById('btn-reset-all').addEventListener('click', ()=>$rstOv.classList.add('open'));
+document.getElementById('btn-close-reset').addEventListener('click', ()=>$rstOv.classList.remove('open'));
+document.getElementById('btn-cancel-reset').addEventListener('click', ()=>$rstOv.classList.remove('open'));
+document.getElementById('btn-confirm-reset').addEventListener('click', async ()=>{
+  stopAll(); seList=[]; cursor=0;
+  await dbClear('audio_files'); await dbClear('app_settings');
+  $rstOv.classList.remove('open');
+  renderList(); updateNP();
+  $fill.style.width='0%'; $tCur.textContent='0:00'; $tTot.textContent='0:00';
+});
+$rstOv.addEventListener('click', e=>{ if(e.target===$rstOv) $rstOv.classList.remove('open'); });
+
+// ===== Settings modal =====
+function fmtVal(fmt, v) {
+  if (fmt==='pct')   return Math.round(v)+'%';
+  if (fmt==='ms')    return v+'ms';
+  if (fmt==='db')    return (v>0?'+':'')+v;
+  if (fmt==='pan')   return v==0?'C':v<0?'L'+Math.abs(v):'R'+v;
+  if (fmt==='speed') return (v/100).toFixed(2)+'×';
+  return v;
 }
 
-$volSlider.addEventListener('input', () => {
-  setMasterVolume(parseInt($volSlider.value));
+// Bind sliders
+document.querySelectorAll('#settings-modal input[type=range]').forEach(sl => {
+  sl.addEventListener('input', () => {
+    const dId = 'sv-'+sl.id.replace('s-','');
+    const d = document.getElementById(dId);
+    if (d&&d.dataset.fmt) d.textContent = fmtVal(d.dataset.fmt, parseFloat(sl.value));
+  });
 });
 
-// ===== IMPORT =====
-$btnImport.addEventListener('click', () => {
-  ensureAudioCtx();
-  $fileInput.click();
-});
-$fileInput.addEventListener('change', () => {
-  importFiles($fileInput.files);
-  $fileInput.value = '';
-});
+// Double-click inline edit
+function bindDblClick(disp) {
+  disp.addEventListener('dblclick', ()=>startEdit(disp));
+}
+document.querySelectorAll('.setting-value[data-slider],.eq-band-val[data-slider]').forEach(bindDblClick);
 
-// ===== DRAG & DROP (file) =====
-$dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  if (e.dataTransfer.types.includes('Files')) {
-    $dropZone.classList.add('drag-over');
-  }
-});
-$dropZone.addEventListener('dragleave', (e) => {
-  if (!$dropZone.contains(e.relatedTarget)) {
-    $dropZone.classList.remove('drag-over');
-  }
-});
-$dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  $dropZone.classList.remove('drag-over');
-  if (e.dataTransfer.files.length) {
-    ensureAudioCtx();
-    importFiles(e.dataTransfer.files);
-  }
-});
-
-// ===== STATUS UPDATE =====
-function updateStatus() {
-  $statusQ.innerHTML = `<strong>${seList.length > 0 ? cursor + 1 : 0}</strong> / <strong>${seList.length}</strong>`;
+function startEdit(disp) {
+  const sl = document.getElementById(disp.dataset.slider);
+  if (!sl) return;
+  const inp = document.createElement('input');
+  inp.type='text'; inp.className='setting-value-input'; inp.value=sl.value;
+  disp.replaceWith(inp); inp.focus(); inp.select();
+  const done = () => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) {
+      sl.value = Math.max(parseFloat(sl.min), Math.min(parseFloat(sl.max), v));
+      sl.dispatchEvent(new Event('input'));
+    }
+    const nd = document.createElement('span');
+    nd.className=disp.className; nd.dataset.slider=disp.dataset.slider; nd.dataset.fmt=disp.dataset.fmt;
+    nd.textContent = fmtVal(disp.dataset.fmt, parseFloat(sl.value));
+    bindDblClick(nd); inp.replaceWith(nd);
+  };
+  const cancel = () => {
+    const nd = document.createElement('span');
+    nd.className=disp.className; nd.dataset.slider=disp.dataset.slider; nd.dataset.fmt=disp.dataset.fmt;
+    nd.textContent=disp.textContent; bindDblClick(nd); inp.replaceWith(nd);
+  };
+  inp.addEventListener('blur', done);
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') done(); if(e.key==='Escape'){e.preventDefault();cancel();} });
 }
 
-// ===== SETTINGS MODAL =====
 function openSettings(idx) {
-  editingIndex = idx;
-  const se = seList[idx];
-  const s = se.settings;
-
-  $modalName.textContent = se.name;
-
-  document.getElementById('s-volume').value = Math.round(s.volume * 100);
-  document.getElementById('sv-volume').textContent = Math.round(s.volume * 100) + '%';
-
-  document.getElementById('s-delay').value = s.delay;
-  document.getElementById('sv-delay').textContent = s.delay + 'ms';
-
-  document.getElementById('s-fadein-on').checked = s.fadeIn;
-  document.getElementById('s-fadein').value = s.fadeInTime;
-  document.getElementById('sv-fadein').textContent = s.fadeInTime + 'ms';
-
-  document.getElementById('s-fadeout-on').checked = s.fadeOut;
-  document.getElementById('s-fadeout').value = s.fadeOutTime;
-  document.getElementById('sv-fadeout').textContent = s.fadeOutTime + 'ms';
-
-  document.getElementById('s-eq-low').value = s.eqLow;
-  document.getElementById('sv-eq-low').textContent = s.eqLow > 0 ? '+' + s.eqLow : s.eqLow;
-  document.getElementById('s-eq-mid').value = s.eqMid;
-  document.getElementById('sv-eq-mid').textContent = s.eqMid > 0 ? '+' + s.eqMid : s.eqMid;
-  document.getElementById('s-eq-high').value = s.eqHigh;
-  document.getElementById('sv-eq-high').textContent = s.eqHigh > 0 ? '+' + s.eqHigh : s.eqHigh;
-
-  $modal.classList.add('open');
+  editingIdx = idx;
+  const se=seList[idx], s=se.settings;
+  document.getElementById('modal-se-name').textContent = se.name;
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el){el.value=v;el.dispatchEvent(new Event('input'));} };
+  set('s-volume', Math.round(s.volume*100));
+  set('s-pan', s.pan);
+  set('s-delay', s.delay);
+  set('s-speed', Math.round(s.speed*100));
+  document.getElementById('s-fadein-on').checked=s.fadeIn;
+  set('s-fadein', s.fadeInTime);
+  document.getElementById('s-fadeout-on').checked=s.fadeOut;
+  set('s-fadeout', s.fadeOutTime);
+  set('s-eq-low', s.eqLow); set('s-eq-mid', s.eqMid); set('s-eq-high', s.eqHigh);
+  $settOv.classList.add('open');
 }
 
-// Live updates for modal sliders
-function bindModalSlider(id, displayId, fmt) {
-  const el = document.getElementById(id);
-  const disp = document.getElementById(displayId);
-  el.addEventListener('input', () => {
-    const v = parseFloat(el.value);
-    disp.textContent = fmt(v);
+async function saveSettings() {
+  if (editingIdx===null) return;
+  const se=seList[editingIdx];
+  se.settings.volume   = parseInt(document.getElementById('s-volume').value)/100;
+  se.settings.pan      = parseInt(document.getElementById('s-pan').value);
+  se.settings.delay    = parseInt(document.getElementById('s-delay').value);
+  se.settings.speed    = parseInt(document.getElementById('s-speed').value)/100;
+  se.settings.fadeIn   = document.getElementById('s-fadein-on').checked;
+  se.settings.fadeInTime  = parseInt(document.getElementById('s-fadein').value);
+  se.settings.fadeOut  = document.getElementById('s-fadeout-on').checked;
+  se.settings.fadeOutTime = parseInt(document.getElementById('s-fadeout').value);
+  se.settings.eqLow    = parseFloat(document.getElementById('s-eq-low').value);
+  se.settings.eqMid    = parseFloat(document.getElementById('s-eq-mid').value);
+  se.settings.eqHigh   = parseFloat(document.getElementById('s-eq-high').value);
+  await saveSeSettings();
+  closeSett(); renderList();
+}
+
+function resetSett() {
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el){el.value=v;el.dispatchEvent(new Event('input'));} };
+  set('s-volume',100); set('s-pan',0); set('s-delay',0); set('s-speed',100);
+  document.getElementById('s-fadein-on').checked=false; set('s-fadein',0);
+  document.getElementById('s-fadeout-on').checked=false; set('s-fadeout',0);
+  set('s-eq-low',0); set('s-eq-mid',0); set('s-eq-high',0);
+}
+
+function closeSett() { $settOv.classList.remove('open'); editingIdx=null; }
+
+document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+document.getElementById('btn-close-settings').addEventListener('click', closeSett);
+document.getElementById('btn-close-settings2').addEventListener('click', closeSett);
+document.getElementById('btn-reset-settings').addEventListener('click', resetSett);
+$settOv.addEventListener('click', e=>{ if(e.target===$settOv) closeSett(); });
+
+document.getElementById('btn-remove-se').addEventListener('click', async ()=>{
+  if (editingIdx===null) return;
+  const id=seList[editingIdx].id;
+  stopIdx(editingIdx);
+  seList.splice(editingIdx,1);
+  await dbDel('audio_files',id);
+  if (cursor>=seList.length) cursor=Math.max(0,seList.length-1);
+  await saveOrder();
+  closeSett(); renderList(); updateNP();
+});
+
+// ===== Keybind modal =====
+let recAction=null, recBtn=null;
+
+function openKbModal() {
+  renderKbTable();
+  $kbOv.classList.add('open');
+}
+
+function renderKbTable() {
+  const t = document.getElementById('keybind-table');
+  t.innerHTML = `<thead><tr><th>アクション</th><th>現在のキー</th><th></th></tr></thead><tbody>${
+    Object.keys(KB_LABELS).map(a=>`
+      <tr>
+        <td>${KB_LABELS[a]}</td>
+        <td>${(kb[a]||[]).map(k=>`<kbd>${kbLabel(k)}</kbd>`).join(' ')}</td>
+        <td><button class="btn-edit-kb" data-action="${a}">変更</button></td>
+      </tr>`).join('')
+  }</tbody>`;
+  t.querySelectorAll('.btn-edit-kb').forEach(btn => {
+    btn.addEventListener('click', ()=>{
+      if (recAction) { recBtn.classList.remove('recording'); recBtn.textContent='変更'; }
+      recAction=btn.dataset.action; recBtn=btn;
+      btn.classList.add('recording'); btn.textContent='入力待ち…';
+    });
   });
 }
 
-bindModalSlider('s-volume', 'sv-volume', v => Math.round(v) + '%');
-bindModalSlider('s-delay', 'sv-delay', v => v + 'ms');
-bindModalSlider('s-fadein', 'sv-fadein', v => v + 'ms');
-bindModalSlider('s-fadeout', 'sv-fadeout', v => v + 'ms');
-bindModalSlider('s-eq-low', 'sv-eq-low', v => (v > 0 ? '+' : '') + v);
-bindModalSlider('s-eq-mid', 'sv-eq-mid', v => (v > 0 ? '+' : '') + v);
-bindModalSlider('s-eq-high', 'sv-eq-high', v => (v > 0 ? '+' : '') + v);
+document.addEventListener('keydown', e=>{
+  if (!recAction) return;
+  if (e.key==='Escape') { recBtn.classList.remove('recording'); recBtn.textContent='変更'; recAction=null; recBtn=null; return; }
+  e.preventDefault(); e.stopPropagation();
+  kb[recAction]=[e.key]; saveKB(); renderHints();
+  recBtn.classList.remove('recording'); recBtn.textContent='変更';
+  recAction=null; recBtn=null;
+  renderKbTable();
+}, { capture:true });
 
-function saveSettings() {
-  if (editingIndex === null) return;
-  const se = seList[editingIndex];
-  se.settings.volume = parseInt(document.getElementById('s-volume').value) / 100;
-  se.settings.delay = parseInt(document.getElementById('s-delay').value);
-  se.settings.fadeIn = document.getElementById('s-fadein-on').checked;
-  se.settings.fadeInTime = parseInt(document.getElementById('s-fadein').value);
-  se.settings.fadeOut = document.getElementById('s-fadeout-on').checked;
-  se.settings.fadeOutTime = parseInt(document.getElementById('s-fadeout').value);
-  se.settings.eqLow = parseFloat(document.getElementById('s-eq-low').value);
-  se.settings.eqMid = parseFloat(document.getElementById('s-eq-mid').value);
-  se.settings.eqHigh = parseFloat(document.getElementById('s-eq-high').value);
-  closeModal();
-  renderList();
-}
-
-function closeModal() {
-  $modal.classList.remove('open');
-  editingIndex = null;
-}
-
-document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
-document.getElementById('btn-close-modal').addEventListener('click', closeModal);
-document.getElementById('btn-close-modal2').addEventListener('click', closeModal);
-$modal.addEventListener('click', (e) => { if (e.target === $modal) closeModal(); });
-
-document.getElementById('btn-remove-se').addEventListener('click', () => {
-  if (editingIndex === null) return;
-  seList.splice(editingIndex, 1);
-  if (cursor >= seList.length) cursor = Math.max(0, seList.length - 1);
-  closeModal();
-  renderList();
-  updateStatus();
+document.getElementById('btn-close-keybind').addEventListener('click', ()=>$kbOv.classList.remove('open'));
+document.getElementById('btn-close-keybind2').addEventListener('click', ()=>$kbOv.classList.remove('open'));
+document.getElementById('btn-reset-keybinds').addEventListener('click', ()=>{
+  kb=JSON.parse(JSON.stringify(KB_DEFAULT)); saveKB(); renderHints(); renderKbTable();
 });
+$kbOv.addEventListener('click', e=>{ if(e.target===$kbOv) $kbOv.classList.remove('open'); });
 
-// ===== UTILS =====
-function fmtTime(s) {
-  if (!isFinite(s)) return '0:00';
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return m + ':' + String(sec).padStart(2, '0');
-}
+// ===== Utils =====
+function fmtT(s) { if(!isFinite(s)||s<0) return '0:00'; const m=Math.floor(s/60),sec=Math.floor(s%60); return m+':'+String(sec).padStart(2,'0'); }
+function esc(s)  { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function flashScreen() { const el=document.createElement('div'); el.className='key-flash'; document.body.appendChild(el); setTimeout(()=>el.remove(),220); }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// ===== PWA =====
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
-function setPlayIcon(playing) {
-  const icon = document.getElementById('play-icon');
-  if (playing) {
-    icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
-    icon.setAttribute('fill', 'currentColor');
-  } else {
-    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-  }
-}
-
-function flashScreen() {
-  const el = document.createElement('div');
-  el.className = 'key-flash';
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 300);
-}
-
-// ===== PWA Service Worker =====
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
-
-// Init
-updateStatus();
+// ===== INIT =====
+(async () => {
+  loadKB(); renderHints(); setVol(80);
+  db = await openDB();
+  await loadDB();
+  updateNP();
+})();
 </script>
 </body>
 </html>
