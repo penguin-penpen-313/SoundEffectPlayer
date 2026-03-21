@@ -78,7 +78,11 @@
     #empty-state p{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-align:center;line-height:2}
     #se-list{list-style:none;padding:6px;display:flex;flex-direction:column;gap:3px}
 
-    .se-item{display:grid;grid-template-columns:28px 1fr 54px 24px;align-items:center;gap:7px;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:border-color .1s,background .1s;user-select:none;position:relative}
+    .se-item{display:grid;grid-template-columns:28px 1fr 54px 26px 24px;align-items:center;gap:7px;padding:7px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:border-color .1s,background .1s;user-select:none;position:relative}
+    .btn-play-item{background:none;border:1px solid var(--border-b);border-radius:4px;color:var(--text-dim);width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
+    .btn-play-item:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-play-item.is-playing{border-color:var(--accent);color:var(--accent);background:rgba(125,216,240,.12)}
+    .btn-play-item svg{width:11px;height:11px}
     .se-item:hover{border-color:var(--border-b);background:var(--surface3)}
     .se-item.active{border-color:var(--accent2);background:var(--active)}
     .se-item.playing{border-color:var(--accent);background:var(--playing);animation:icePulse 2s ease-in-out infinite}
@@ -189,7 +193,7 @@
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.2</span>
+      <span class="logo-ver">v0.3</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -225,7 +229,7 @@
 
   <div id="playback-bar">
     <div class="now-playing">
-      <span class="np-label">// NOW PLAYING</span>
+      <span class="np-label">// SELECTED</span>
       <span class="np-name idle" id="np-name">- - -</span>
     </div>
     <div class="transport-btns">
@@ -377,7 +381,7 @@
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.2
+// PenguinSoundEffectPlayer  v0.3
 // =============================================
 
 // ===== IndexedDB =====
@@ -557,16 +561,37 @@ function renderList() {
         </div>
       </div>
       ${wfSvg(se.wf)}
-      <button class="btn-settings" data-index="${i}">
+      <button class="btn-play-item${activeSources.some(s=>s.seId===se.id)?' is-playing':''}" data-index="${i}" title="再生 / 停止">
+        ${activeSources.some(s=>s.seId===se.id)
+          ? `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>`
+          : `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`
+        }
+      </button>
+      <button class="btn-settings" data-index="${i}" title="設定">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
       </button>`;
 
-    // Click: select + play
+    // Click: select only (no play)
     li.addEventListener('click', e => {
-      if (e.target.closest('.btn-settings') || e.target.closest('.drag-handle')) return;
+      if (e.target.closest('.btn-settings') || e.target.closest('.drag-handle') || e.target.closest('.btn-play-item')) return;
       cursor = i;
-      playIdx(i);
       renderList();
+      updateNP();
+    });
+
+    // Play button: toggle play/stop for this item
+    li.querySelector('.btn-play-item').addEventListener('click', e => {
+      e.stopPropagation();
+      const isPlaying = activeSources.some(s=>s.seId===se.id);
+      if (isPlaying) {
+        stopIdx(i);
+        // remove from activeSources immediately so renderList reflects it
+        activeSources = activeSources.filter(s=>s.seId!==se.id);
+        renderList(); updateNP();
+        if (!activeSources.length) { clearInterval(progressTimer); $fill.style.width='0%'; $tCur.textContent='0:00'; }
+      } else {
+        playIdx(i);
+      }
     });
 
     li.querySelector('.btn-settings').addEventListener('click', e => {
@@ -754,11 +779,12 @@ function startProgress() {
 }
 
 function updateNP() {
-  const en = activeSources.filter(e=>e.idx===cursor);
   const se = seList[cursor];
   if (se) {
     $npName.textContent = se.name;
     $npName.classList.remove('idle');
+    // Show duration of cursor item, or playing time if it's playing
+    const en = activeSources.filter(e=>e.idx===cursor);
     if (!en.length) $tTot.textContent = fmtT(se.duration);
   } else {
     $npName.textContent = '- - -';
@@ -883,12 +909,12 @@ function fmtVal(fmt, v) {
   return v;
 }
 
-// Bind sliders
+// Bind sliders — use querySelector with data-slider to always find current DOM element
 document.querySelectorAll('#settings-modal input[type=range]').forEach(sl => {
   sl.addEventListener('input', () => {
-    const dId = 'sv-'+sl.id.replace('s-','');
-    const d = document.getElementById(dId);
-    if (d&&d.dataset.fmt) d.textContent = fmtVal(d.dataset.fmt, parseFloat(sl.value));
+    // Find display by data-slider (works even if span was replaced by inline edit and re-created)
+    const disp = document.querySelector(`#settings-modal [data-slider="${sl.id}"], #settings-modal [data-slider="${sl.id}"]`);
+    if (disp && disp.dataset.fmt) disp.textContent = fmtVal(disp.dataset.fmt, parseFloat(sl.value));
   });
 });
 
@@ -901,27 +927,41 @@ document.querySelectorAll('.setting-value[data-slider],.eq-band-val[data-slider]
 function startEdit(disp) {
   const sl = document.getElementById(disp.dataset.slider);
   if (!sl) return;
+  const sliderFmt  = disp.dataset.fmt;
+  const sliderAttr = disp.dataset.slider;
+  const sliderCls  = disp.className;
+
   const inp = document.createElement('input');
   inp.type='text'; inp.className='setting-value-input'; inp.value=sl.value;
   disp.replaceWith(inp); inp.focus(); inp.select();
+
+  let finished = false;
   const done = () => {
+    if (finished) return; finished = true;
     const v = parseFloat(inp.value);
     if (!isNaN(v)) {
       sl.value = Math.max(parseFloat(sl.min), Math.min(parseFloat(sl.max), v));
       sl.dispatchEvent(new Event('input'));
     }
     const nd = document.createElement('span');
-    nd.className=disp.className; nd.dataset.slider=disp.dataset.slider; nd.dataset.fmt=disp.dataset.fmt;
-    nd.textContent = fmtVal(disp.dataset.fmt, parseFloat(sl.value));
-    bindDblClick(nd); inp.replaceWith(nd);
+    nd.className=sliderCls; nd.dataset.slider=sliderAttr; nd.dataset.fmt=sliderFmt;
+    nd.textContent = fmtVal(sliderFmt, parseFloat(sl.value));
+    bindDblClick(nd);
+    if (inp.parentNode) inp.replaceWith(nd);
   };
   const cancel = () => {
+    if (finished) return; finished = true;
     const nd = document.createElement('span');
-    nd.className=disp.className; nd.dataset.slider=disp.dataset.slider; nd.dataset.fmt=disp.dataset.fmt;
-    nd.textContent=disp.textContent; bindDblClick(nd); inp.replaceWith(nd);
+    nd.className=sliderCls; nd.dataset.slider=sliderAttr; nd.dataset.fmt=sliderFmt;
+    nd.textContent = fmtVal(sliderFmt, parseFloat(sl.value));
+    bindDblClick(nd);
+    if (inp.parentNode) inp.replaceWith(nd);
   };
   inp.addEventListener('blur', done);
-  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') done(); if(e.key==='Escape'){e.preventDefault();cancel();} });
+  inp.addEventListener('keydown', e => {
+    if (e.key==='Enter') { e.preventDefault(); done(); }
+    if (e.key==='Escape') { e.preventDefault(); cancel(); }
+  });
 }
 
 function openSettings(idx) {
@@ -1016,6 +1056,8 @@ function renderKbTable() {
 document.addEventListener('keydown', e=>{
   if (!recAction) return;
   if (e.key==='Escape') { recBtn.classList.remove('recording'); recBtn.textContent='変更'; recAction=null; recBtn=null; return; }
+  // Enterキーはキーバインドに割り当て不可
+  if (e.key==='Enter') return;
   e.preventDefault(); e.stopPropagation();
   kb[recAction]=[e.key]; saveKB(); renderHints();
   recBtn.classList.remove('recording'); recBtn.textContent='変更';

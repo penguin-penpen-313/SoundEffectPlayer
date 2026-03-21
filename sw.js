@@ -1,7 +1,7 @@
 // PenguinSoundEffectPlayer Service Worker
-// v0.2 — cache updated
+// v0.3 — cache updated
 
-const CACHE_NAME = 'psep-v0.2';
+const CACHE_NAME = 'psep-v0.3';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
