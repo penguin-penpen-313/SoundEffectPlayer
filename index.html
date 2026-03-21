@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SE Player</title>
+  <meta name="description" content="声劇・舞台用SEプレイヤー" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@100;200;300;400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07070d;
+      --surface: #0d0d1a;
+      --surface2: #13131f;
+      --surface3: #1a1a2e;
+      --border: #1e1e3a;
+      --border-bright: #2a2a50;
+      --accent: #00d4ff;
+      --accent2: #7b2fff;
+      --accent3: #ff2f7b;
+      --text: #c8d0e8;
+      --text-dim: #5a6080;
+      --text-bright: #e8f0ff;
+      --active: #00d4ff22;
+      --playing: #00d4ff44;
+      --warn: #ff8c00;
+      --mono: 'Share Tech Mono', monospace;
+      --sans: 'Rajdhani', sans-serif;
+      --light: 'Exo 2', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scanline effect */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,212,255,0.015) 2px,
+        rgba(0,212,255,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Grid noise background */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #app {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 18px;
+      color: var(--accent);
+      text-shadow: 0 0 20px var(--accent);
+      letter-spacing: 4px;
+      flex-shrink: 0;
+    }
+    .logo span { color: var(--accent2); }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: auto;
+    }
+
+    /* Master Volume */
+    .vol-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+    }
+    .vol-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+    }
+    .vol-display {
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--accent);
+      min-width: 36px;
+      text-align: right;
+    }
+    input[type=range].vol-slider {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range].vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      cursor: pointer;
+    }
+
+    /* Key hints */
+    .key-hints {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .key-hint {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    kbd {
+      background: var(--surface3);
+      border: 1px solid var(--border-bright);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text);
+    }
+
+    /* Import Button */
+    .btn-import {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent2);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-import:hover { background: #9b4fff; box-shadow: 0 0 16px var(--accent2); }
+    .btn-import svg { width: 14px; height: 14px; }
+
+    /* ===== MAIN LAYOUT ===== */
+    main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ===== PLAYLIST PANEL ===== */
+    #playlist-panel {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+    }
+    .panel-count {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent2);
+    }
+
+    /* Drop zone */
+    #drop-zone {
+      flex: 1;
+      overflow-y: auto;
+      position: relative;
+    }
+    #drop-zone.drag-over::after {
+      content: 'DROP FILES HERE';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,212,255,0.08);
+      border: 2px dashed var(--accent);
+      font-family: var(--mono);
+      font-size: 18px;
+      color: var(--accent);
+      letter-spacing: 6px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    /* Empty state */
+    #empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+      color: var(--text-dim);
+    }
+    #empty-state svg { width: 48px; height: 48px; opacity: 0.3; }
+    #empty-state p { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-align: center; line-height: 1.8; }
+
+    /* Scrollbar */
+    #drop-zone::-webkit-scrollbar { width: 4px; }
+    #drop-zone::-webkit-scrollbar-track { background: var(--surface); }
+    #drop-zone::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+    /* SE List */
+    #se-list {
+      list-style: none;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .se-item {
+      display: grid;
+      grid-template-columns: 32px 1fr auto auto auto;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.1s;
+      user-select: none;
+      position: relative;
+    }
+    .se-item:hover { border-color: var(--border-bright); background: var(--surface3); }
+    .se-item.active {
+      border-color: var(--accent);
+      background: var(--active);
+      box-shadow: 0 0 12px rgba(0,212,255,0.1);
+    }
+    .se-item.playing {
+      border-color: var(--accent);
+      background: var(--playing);
+      box-shadow: 0 0 20px rgba(0,212,255,0.15);
+      animation: playingPulse 1.5s ease-in-out infinite;
+    }
+    .se-item.dragging {
+      opacity: 0.4;
+      border-style: dashed;
+    }
+    .se-item.drag-target { border-color: var(--accent2); }
+    @keyframes playingPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(0,212,255,0.15); }
+      50% { box-shadow: 0 0 30px rgba(0,212,255,0.3); }
+    }
+
+    .se-index {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    .se-item.active .se-index { color: var(--accent); }
+
+    .se-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+    }
+    .se-name {
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-bright);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .se-item.active .se-name { color: var(--accent); }
+    .se-item.playing .se-name { color: var(--accent); }
+    .se-meta {
+      display: flex;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .se-meta span { display: flex; align-items: center; gap: 3px; }
+
+    .se-waveform {
+      width: 60px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .se-vol-mini {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    .btn-settings {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-dim);
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-settings:hover { border-color: var(--accent2); color: var(--accent2); }
+    .btn-settings svg { width: 13px; height: 13px; }
+
+    .drag-handle {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: transparent;
+      border-radius: 6px 0 0 6px;
+      cursor: grab;
+      transition: background 0.15s;
+    }
+    .se-item:hover .drag-handle { background: var(--border-bright); }
+    .se-item.active .drag-handle { background: var(--accent); }
+
+    /* Playing wave indicator */
+    .wave-indicator {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 16px;
+    }
+    .wave-bar {
+      width: 3px;
+      background: var(--accent);
+      border-radius: 1px;
+      animation: waveAnim 0.6s ease-in-out infinite;
+    }
+    .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.15s; }
+    @keyframes waveAnim {
+      0%, 100% { height: 4px; }
+      50% { height: 14px; }
+    }
+
+    /* ===== PLAYBACK BAR ===== */
+    #playback-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .now-playing {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 160px;
+      max-width: 220px;
+    }
+    .np-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+    }
+    .np-name {
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .np-name.idle { color: var(--text-dim); }
+
+    .transport-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-transport {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-transport:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-transport.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg);
+      width: 52px;
+      height: 52px;
+      box-shadow: 0 0 20px rgba(0,212,255,0.3);
+    }
+    .btn-transport.primary:hover { box-shadow: 0 0 30px rgba(0,212,255,0.5); }
+    .btn-transport svg { width: 18px; height: 18px; }
+    .btn-transport.primary svg { width: 22px; height: 22px; }
+
+    /* Progress bar */
+    .progress-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .progress-bar-wrap {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      transition: width 0.1s linear;
+      width: 0%;
+    }
+    .progress-times {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* Status info */
+    .status-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      min-width: 80px;
+    }
+    .status-queue {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .status-queue strong { color: var(--accent2); }
+
+    /* ===== SETTINGS MODAL ===== */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    #modal-overlay.open { display: flex; }
+
+    #settings-modal {
+      background: var(--surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 12px;
+      width: min(560px, 94vw);
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 0 60px rgba(0,212,255,0.1), 0 0 120px rgba(123,47,255,0.1);
+    }
+    #settings-modal::-webkit-scrollbar { width: 4px; }
+    #settings-modal::-webkit-scrollbar-thumb { background: var(--border-bright); }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--accent);
+      letter-spacing: 3px;
+    }
+    .modal-subtitle {
+      font-family: var(--sans);
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      max-width: 300px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-close {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-dim);
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-close:hover { border-color: var(--accent3); color: var(--accent3); }
+
+    .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 20px; }
+
+    .setting-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .setting-group-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 3px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .setting-row {
+      display: grid;
+      grid-template-columns: 120px 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+    .setting-label {
+      font-family: var(--sans);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .setting-value {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      text-align: right;
+      min-width: 50px;
+    }
+    input[type=range].setting-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range].setting-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent2);
+      box-shadow: 0 0 6px var(--accent2);
+      cursor: pointer;
+    }
+    .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+    input[type=checkbox].toggle {
+      -webkit-appearance: none;
+      width: 36px;
+      height: 20px;
+      background: var(--border);
+      border-radius: 10px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    input[type=checkbox].toggle:checked { background: var(--accent2); }
+    input[type=checkbox].toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      background: white;
+      border-radius: 50%;
+      transition: left 0.2s;
+    }
+    input[type=checkbox].toggle:checked::after { left: 19px; }
+    .toggle-label { font-family: var(--sans); font-size: 12px; color: var(--text-dim); }
+
+    /* EQ Section */
+    .eq-section {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+    .eq-band {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+    .eq-band-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+    .eq-band-val {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+    }
+    input[type=range].eq-slider {
+      -webkit-appearance: none;
+      writing-mode: vertical-lr;
+      direction: rtl;
+      width: 4px;
+      height: 80px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range].eq-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      cursor: pointer;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-action {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 7px 16px;
+      font-family: var(--sans);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-action:hover { border-color: var(--border-bright); }
+    .btn-action.danger { color: var(--accent3); }
+    .btn-action.danger:hover { border-color: var(--accent3); }
+    .btn-action.primary {
+      background: var(--accent2);
+      border-color: var(--accent2);
+      color: white;
+    }
+    .btn-action.primary:hover { background: #9b4fff; }
+
+    /* Flash on keypress */
+    .key-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9998;
+      animation: keyFlash 0.3s ease-out forwards;
+    }
+    @keyframes keyFlash {
+      0% { background: rgba(0,212,255,0.08); }
+      100% { background: transparent; }
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .key-hints { display: none; }
+      .vol-section { padding: 4px 8px; }
+      input[type=range].vol-slider { width: 70px; }
+      .now-playing { min-width: 100px; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <header>
+    <div class="logo">SE<span>_</span>PLAYER</div>
+
+    <div class="key-hints">
+      <div class="key-hint"><kbd>Enter</kbd><kbd>→</kbd> 再生/次へ</div>
+      <div class="key-hint"><kbd>←</kbd> 前へ</div>
+      <div class="key-hint"><kbd>↑</kbd><kbd>↓</kbd> 音量</div>
+    </div>
+
+    <div class="header-controls">
+      <div class="vol-section">
+        <span class="vol-label">VOL</span>
+        <input type="range" class="vol-slider" id="master-vol" min="0" max="100" value="80" />
+        <span class="vol-display" id="vol-display">80</span>
+      </div>
+      <button class="btn-import" id="btn-import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        IMPORT
+      </button>
+      <input type="file" id="file-input" multiple accept="audio/*" style="display:none" />
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main>
+    <div id="playlist-panel">
+      <div class="panel-header">
+        <span class="panel-title">// PLAYLIST</span>
+        <span class="panel-count" id="panel-count">0 FILES</span>
+      </div>
+
+      <div id="drop-zone">
+        <div id="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <p>音声ファイルをドロップ<br/>または IMPORT ボタンで追加<br/><br/>MP3 / WAV / OGG / FLAC 対応</p>
+        </div>
+        <ul id="se-list"></ul>
+      </div>
+    </div>
+  </main>
+
+  <!-- PLAYBACK BAR -->
+  <div id="playback-bar">
+    <div class="now-playing">
+      <span class="np-label">// NOW PLAYING</span>
+      <span class="np-name idle" id="np-name">- - -</span>
+    </div>
+
+    <div class="transport-btns">
+      <button class="btn-transport" id="btn-prev" title="前へ (←)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="19 20 9 12 19 4 19 20"/>
+          <line x1="5" y1="19" x2="5" y2="5"/>
+        </svg>
+      </button>
+      <button class="btn-transport primary" id="btn-play" title="再生 (Enter / →)">
+        <svg viewBox="0 0 24 24" fill="currentColor" id="play-icon">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+      </button>
+      <button class="btn-transport" id="btn-stop" title="停止">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="progress-section">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-times">
+        <span id="time-current">0:00</span>
+        <span id="time-total">0:00</span>
+      </div>
+    </div>
+
+    <div class="status-info">
+      <span class="status-queue" id="status-queue"><strong>0</strong> / <strong>0</strong></span>
+      <span class="status-queue" style="color:var(--text-dim);font-size:9px;">CURSOR</span>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="modal-overlay">
+  <div id="settings-modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">// SE SETTINGS</div>
+        <div class="modal-subtitle" id="modal-se-name">-</div>
+      </div>
+      <button class="btn-close" id="btn-close-modal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Volume -->
+      <div class="setting-group">
+        <div class="setting-group-title">VOLUME</div>
+        <div class="setting-row">
+          <span class="setting-label">個別音量</span>
+          <input type="range" class="setting-slider" id="s-volume" min="0" max="200" value="100" />
+          <span class="setting-value" id="sv-volume">100%</span>
+        </div>
+      </div>
+      <!-- Delay -->
+      <div class="setting-group">
+        <div class="setting-group-title">TIMING</div>
+        <div class="setting-row">
+          <span class="setting-label">再生遅延</span>
+          <input type="range" class="setting-slider" id="s-delay" min="0" max="5000" step="50" value="0" />
+          <span class="setting-value" id="sv-delay">0ms</span>
+        </div>
+      </div>
+      <!-- Fade -->
+      <div class="setting-group">
+        <div class="setting-group-title">FADE</div>
+        <div class="setting-row">
+          <span class="setting-label">フェードイン</span>
+          <div class="toggle-wrap">
+            <input type="checkbox" class="toggle" id="s-fadein-on" />
+            <span class="toggle-label">有効</span>
+          </div>
+          <span class="setting-value"></span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">FI 時間</span>
+          <input type="range" class="setting-slider" id="s-fadein" min="0" max="5000" step="50" value="0" />
+          <span class="setting-value" id="sv-fadein">0ms</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">フェードアウト</span>
+          <div class="toggle-wrap">
+            <input type="checkbox" class="toggle" id="s-fadeout-on" />
+            <span class="toggle-label">有効</span>
+          </div>
+          <span class="setting-value"></span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">FO 時間</span>
+          <input type="range" class="setting-slider" id="s-fadeout" min="0" max="5000" step="50" value="0" />
+          <span class="setting-value" id="sv-fadeout">0ms</span>
+        </div>
+      </div>
+      <!-- EQ -->
+      <div class="setting-group">
+        <div class="setting-group-title">EQUALIZER</div>
+        <div class="eq-section">
+          <div class="eq-band">
+            <span class="eq-band-val" id="sv-eq-low">0</span>
+            <input type="range" class="eq-slider" id="s-eq-low" min="-12" max="12" step="0.5" value="0" />
+            <span class="eq-band-label">LOW</span>
+            <span class="eq-band-label">200Hz</span>
+          </div>
+          <div class="eq-band">
+            <span class="eq-band-val" id="sv-eq-mid">0</span>
+            <input type="range" class="eq-slider" id="s-eq-mid" min="-12" max="12" step="0.5" value="0" />
+            <span class="eq-band-label">MID</span>
+            <span class="eq-band-label">1kHz</span>
+          </div>
+          <div class="eq-band">
+            <span class="eq-band-val" id="sv-eq-high">0</span>
+            <input type="range" class="eq-slider" id="s-eq-high" min="-12" max="12" step="0.5" value="0" />
+            <span class="eq-band-label">HIGH</span>
+            <span class="eq-band-label">5kHz</span>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:4px;">※ dB単位 (-12 〜 +12)</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action danger" id="btn-remove-se">削除</button>
+      <button class="btn-action" id="btn-close-modal2">キャンセル</button>
+      <button class="btn-action primary" id="btn-save-settings">適用</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===========================
+// SE PLAYER - Main Application
+// ===========================
+
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// ===== STATE =====
+let seList = [];       // { id, name, buffer, duration, settings }
+let cursor = 0;        // current position in list
+let currentSource = null;
+let currentGain = null;
+let isPlaying = false;
+let progressTimer = null;
+let playStartTime = 0;
+let playOffset = 0;
+let editingIndex = null;
+
+const masterVol = { value: 0.8 };
+
+// Default settings per SE
+function defaultSettings() {
+  return {
+    volume: 1.0,
+    delay: 0,
+    fadeIn: false,
+    fadeInTime: 0,
+    fadeOut: false,
+    fadeOutTime: 0,
+    eqLow: 0,
+    eqMid: 0,
+    eqHigh: 0,
+  };
+}
+
+// ===== DOM refs =====
+const $list     = document.getElementById('se-list');
+const $empty    = document.getElementById('empty-state');
+const $count    = document.getElementById('panel-count');
+const $npName   = document.getElementById('np-name');
+const $btnPlay  = document.getElementById('btn-play');
+const $btnPrev  = document.getElementById('btn-prev');
+const $btnStop  = document.getElementById('btn-stop');
+const $progress = document.getElementById('progress-fill');
+const $timeCur  = document.getElementById('time-current');
+const $timeTotal= document.getElementById('time-total');
+const $statusQ  = document.getElementById('status-queue');
+const $volSlider= document.getElementById('master-vol');
+const $volDisp  = document.getElementById('vol-display');
+const $dropZone = document.getElementById('drop-zone');
+const $fileInput= document.getElementById('file-input');
+const $btnImport= document.getElementById('btn-import');
+const $modal    = document.getElementById('modal-overlay');
+const $modalName= document.getElementById('modal-se-name');
+
+// ===== AUDIO DECODE =====
+async function decodeFile(file) {
+  const ab = await file.arrayBuffer();
+  const ctx = ensureAudioCtx();
+  return await ctx.decodeAudioData(ab);
+}
+
+// ===== IMPORT FILES =====
+async function importFiles(files) {
+  const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(f.name));
+  if (audioFiles.length === 0) return;
+
+  for (const file of audioFiles) {
+    try {
+      ensureAudioCtx();
+      const buffer = await decodeFile(file);
+      seList.push({
+        id: Date.now() + Math.random(),
+        name: file.name.replace(/\.[^.]+$/, ''),
+        fullName: file.name,
+        buffer,
+        duration: buffer.duration,
+        settings: defaultSettings(),
+      });
+    } catch (e) {
+      console.warn('Failed to decode:', file.name, e);
+    }
+  }
+  renderList();
+  updateStatus();
+}
+
+// ===== RENDER LIST =====
+function renderList() {
+  $empty.style.display = seList.length ? 'none' : 'flex';
+  $count.textContent = seList.length + ' FILES';
+
+  $list.innerHTML = '';
+  seList.forEach((se, i) => {
+    const li = document.createElement('li');
+    li.className = 'se-item' + (i === cursor ? ' active' : '');
+    li.dataset.index = i;
+    li.draggable = true;
+
+    const waveHtml = generateMiniWave(se.buffer);
+
+    li.innerHTML = `
+      <div class="drag-handle"></div>
+      <span class="se-index">${String(i+1).padStart(2,'0')}</span>
+      <div class="se-info">
+        <span class="se-name">${escHtml(se.name)}</span>
+        <div class="se-meta">
+          <span>${fmtTime(se.duration)}</span>
+          ${se.settings.delay > 0 ? `<span>⏱ ${se.settings.delay}ms</span>` : ''}
+          ${se.settings.fadeIn ? '<span>FI</span>' : ''}
+          ${se.settings.fadeOut ? '<span>FO</span>' : ''}
+        </div>
+      </div>
+      ${waveHtml}
+      <span class="se-vol-mini">${Math.round(se.settings.volume * 100)}%</span>
+      <button class="btn-settings" data-index="${i}" title="設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/>
+        </svg>
+      </button>
+    `;
+
+    // Click to select
+    li.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-settings')) return;
+      cursor = i;
+      renderList();
+      updateStatus();
+    });
+
+    // Settings button
+    li.querySelector('.btn-settings').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSettings(i);
+    });
+
+    // Drag & Drop
+    li.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', i);
+      li.classList.add('dragging');
+    });
+    li.addEventListener('dragend', () => li.classList.remove('dragging'));
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      li.classList.add('drag-target');
+    });
+    li.addEventListener('dragleave', () => li.classList.remove('drag-target'));
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      li.classList.remove('drag-target');
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const to = i;
+      if (from !== to) {
+        const moved = seList.splice(from, 1)[0];
+        seList.splice(to, 0, moved);
+        // Adjust cursor
+        if (cursor === from) cursor = to;
+        else if (cursor > from && cursor <= to) cursor--;
+        else if (cursor < from && cursor >= to) cursor++;
+        renderList();
+        updateStatus();
+      }
+    });
+
+    $list.appendChild(li);
+  });
+
+  // Update playing state
+  if (isPlaying) markPlaying(cursor);
+
+  // Scroll active item into view
+  const activeEl = $list.querySelector('.se-item.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function generateMiniWave(buffer) {
+  const data = buffer.getChannelData(0);
+  const samples = 30;
+  const step = Math.floor(data.length / samples);
+  let bars = '';
+  for (let i = 0; i < samples; i++) {
+    let max = 0;
+    for (let j = 0; j < step; j++) max = Math.max(max, Math.abs(data[i * step + j] || 0));
+    const h = Math.max(2, Math.round(max * 18));
+    bars += `<rect x="${i * 2}" y="${(20-h)/2}" width="1.5" height="${h}" rx="0.5" fill="var(--border-bright)"/>`;
+  }
+  return `<svg class="se-waveform" viewBox="0 0 60 20" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
+}
+
+function markPlaying(idx) {
+  document.querySelectorAll('.se-item').forEach((el, i) => {
+    el.classList.remove('playing');
+    if (i === idx) el.classList.add('playing');
+  });
+}
+
+// ===== PLAY ENGINE =====
+async function playCurrentSE() {
+  if (seList.length === 0) return;
+
+  const se = seList[cursor];
+  const settings = se.settings;
+
+  stopCurrent(false);
+
+  const ctx = ensureAudioCtx();
+
+  // Build audio graph: source → gain (individual) → EQ → masterGain → destination
+  const source = ctx.createBufferSource();
+  source.buffer = se.buffer;
+
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = settings.volume * masterVol.value;
+
+  // EQ filters
+  const lowFilter = ctx.createBiquadFilter();
+  lowFilter.type = 'lowshelf';
+  lowFilter.frequency.value = 200;
+  lowFilter.gain.value = settings.eqLow;
+
+  const midFilter = ctx.createBiquadFilter();
+  midFilter.type = 'peaking';
+  midFilter.frequency.value = 1000;
+  midFilter.Q.value = 1;
+  midFilter.gain.value = settings.eqMid;
+
+  const highFilter = ctx.createBiquadFilter();
+  highFilter.type = 'highshelf';
+  highFilter.frequency.value = 5000;
+  highFilter.gain.value = settings.eqHigh;
+
+  source.connect(gainNode);
+  gainNode.connect(lowFilter);
+  lowFilter.connect(midFilter);
+  midFilter.connect(highFilter);
+  highFilter.connect(ctx.destination);
+
+  currentSource = source;
+  currentGain = gainNode;
+
+  const now = ctx.currentTime;
+  const delay = settings.delay / 1000;
+  const duration = se.duration;
+
+  // Fade in
+  if (settings.fadeIn && settings.fadeInTime > 0) {
+    const fi = settings.fadeInTime / 1000;
+    gainNode.gain.setValueAtTime(0, now + delay);
+    gainNode.gain.linearRampToValueAtTime(settings.volume * masterVol.value, now + delay + fi);
+  }
+
+  // Fade out
+  if (settings.fadeOut && settings.fadeOutTime > 0) {
+    const fo = settings.fadeOutTime / 1000;
+    const foStart = now + delay + duration - fo;
+    if (foStart > now + delay) {
+      gainNode.gain.setValueAtTime(settings.volume * masterVol.value, foStart);
+      gainNode.gain.linearRampToValueAtTime(0, now + delay + duration);
+    }
+  }
+
+  source.start(now + delay);
+  playStartTime = ctx.currentTime + delay;
+  playOffset = 0;
+  isPlaying = true;
+
+  // UI
+  $npName.textContent = se.name;
+  $npName.classList.remove('idle');
+  $timeTotal.textContent = fmtTime(duration);
+  setPlayIcon(true);
+  markPlaying(cursor);
+  renderList();
+
+  // Progress
+  clearInterval(progressTimer);
+  progressTimer = setInterval(() => updateProgress(se.duration), 100);
+
+  source.onended = () => {
+    if (source === currentSource) {
+      isPlaying = false;
+      clearInterval(progressTimer);
+      setPlayIcon(false);
+      document.querySelectorAll('.se-item').forEach(el => el.classList.remove('playing'));
+      $progress.style.width = '0%';
+      $timeCur.textContent = '0:00';
+      // Auto-advance cursor
+      if (cursor < seList.length - 1) cursor++;
+      renderList();
+      updateStatus();
+    }
+  };
+
+  // Flash
+  flashScreen();
+}
+
+function stopCurrent(resetCursor = false) {
+  if (currentSource) {
+    try { currentSource.stop(); } catch (e) {}
+    currentSource = null;
+    currentGain = null;
+  }
+  clearInterval(progressTimer);
+  isPlaying = false;
+  setPlayIcon(false);
+  document.querySelectorAll('.se-item').forEach(el => el.classList.remove('playing'));
+  $progress.style.width = '0%';
+  $timeCur.textContent = '0:00';
+  if (resetCursor) {
+    $npName.textContent = '- - -';
+    $npName.classList.add('idle');
+  }
+}
+
+function updateProgress(duration) {
+  if (!audioCtx || !isPlaying) return;
+  const elapsed = audioCtx.currentTime - playStartTime;
+  const pct = Math.min(100, (elapsed / duration) * 100);
+  $progress.style.width = pct + '%';
+  $timeCur.textContent = fmtTime(Math.max(0, elapsed));
+}
+
+// ===== KEYBOARD HANDLER =====
+document.addEventListener('keydown', handleKey);
+
+function handleKey(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ($modal.classList.contains('open')) return;
+
+  if (e.key === 'Enter' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (isPlaying) {
+      stopCurrent(false);
+      if (cursor < seList.length - 1) cursor++;
+      else cursor = seList.length - 1;
+      renderList();
+      updateStatus();
+      playCurrentSE();
+    } else {
+      playCurrentSE();
+    }
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    stopCurrent(false);
+    if (cursor > 0) cursor--;
+    renderList();
+    updateStatus();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setMasterVolume(Math.min(100, parseInt($volSlider.value) + 5));
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setMasterVolume(Math.max(0, parseInt($volSlider.value) - 5));
+  }
+}
+
+// ===== TRANSPORT BUTTONS =====
+$btnPlay.addEventListener('click', () => {
+  if (isPlaying) {
+    stopCurrent(false);
+    if (cursor < seList.length - 1) cursor++;
+    renderList();
+    updateStatus();
+    playCurrentSE();
+  } else {
+    playCurrentSE();
+  }
+});
+
+$btnPrev.addEventListener('click', () => {
+  stopCurrent(false);
+  if (cursor > 0) cursor--;
+  renderList();
+  updateStatus();
+});
+
+$btnStop.addEventListener('click', () => {
+  stopCurrent(true);
+  renderList();
+  updateStatus();
+});
+
+// ===== MASTER VOLUME =====
+function setMasterVolume(val) {
+  $volSlider.value = val;
+  masterVol.value = val / 100;
+  $volDisp.textContent = val;
+  if (currentGain && isPlaying) {
+    const se = seList[cursor];
+    currentGain.gain.cancelScheduledValues(0);
+    currentGain.gain.value = se.settings.volume * masterVol.value;
+  }
+}
+
+$volSlider.addEventListener('input', () => {
+  setMasterVolume(parseInt($volSlider.value));
+});
+
+// ===== IMPORT =====
+$btnImport.addEventListener('click', () => {
+  ensureAudioCtx();
+  $fileInput.click();
+});
+$fileInput.addEventListener('change', () => {
+  importFiles($fileInput.files);
+  $fileInput.value = '';
+});
+
+// ===== DRAG & DROP (file) =====
+$dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer.types.includes('Files')) {
+    $dropZone.classList.add('drag-over');
+  }
+});
+$dropZone.addEventListener('dragleave', (e) => {
+  if (!$dropZone.contains(e.relatedTarget)) {
+    $dropZone.classList.remove('drag-over');
+  }
+});
+$dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  $dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) {
+    ensureAudioCtx();
+    importFiles(e.dataTransfer.files);
+  }
+});
+
+// ===== STATUS UPDATE =====
+function updateStatus() {
+  $statusQ.innerHTML = `<strong>${seList.length > 0 ? cursor + 1 : 0}</strong> / <strong>${seList.length}</strong>`;
+}
+
+// ===== SETTINGS MODAL =====
+function openSettings(idx) {
+  editingIndex = idx;
+  const se = seList[idx];
+  const s = se.settings;
+
+  $modalName.textContent = se.name;
+
+  document.getElementById('s-volume').value = Math.round(s.volume * 100);
+  document.getElementById('sv-volume').textContent = Math.round(s.volume * 100) + '%';
+
+  document.getElementById('s-delay').value = s.delay;
+  document.getElementById('sv-delay').textContent = s.delay + 'ms';
+
+  document.getElementById('s-fadein-on').checked = s.fadeIn;
+  document.getElementById('s-fadein').value = s.fadeInTime;
+  document.getElementById('sv-fadein').textContent = s.fadeInTime + 'ms';
+
+  document.getElementById('s-fadeout-on').checked = s.fadeOut;
+  document.getElementById('s-fadeout').value = s.fadeOutTime;
+  document.getElementById('sv-fadeout').textContent = s.fadeOutTime + 'ms';
+
+  document.getElementById('s-eq-low').value = s.eqLow;
+  document.getElementById('sv-eq-low').textContent = s.eqLow > 0 ? '+' + s.eqLow : s.eqLow;
+  document.getElementById('s-eq-mid').value = s.eqMid;
+  document.getElementById('sv-eq-mid').textContent = s.eqMid > 0 ? '+' + s.eqMid : s.eqMid;
+  document.getElementById('s-eq-high').value = s.eqHigh;
+  document.getElementById('sv-eq-high').textContent = s.eqHigh > 0 ? '+' + s.eqHigh : s.eqHigh;
+
+  $modal.classList.add('open');
+}
+
+// Live updates for modal sliders
+function bindModalSlider(id, displayId, fmt) {
+  const el = document.getElementById(id);
+  const disp = document.getElementById(displayId);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    disp.textContent = fmt(v);
+  });
+}
+
+bindModalSlider('s-volume', 'sv-volume', v => Math.round(v) + '%');
+bindModalSlider('s-delay', 'sv-delay', v => v + 'ms');
+bindModalSlider('s-fadein', 'sv-fadein', v => v + 'ms');
+bindModalSlider('s-fadeout', 'sv-fadeout', v => v + 'ms');
+bindModalSlider('s-eq-low', 'sv-eq-low', v => (v > 0 ? '+' : '') + v);
+bindModalSlider('s-eq-mid', 'sv-eq-mid', v => (v > 0 ? '+' : '') + v);
+bindModalSlider('s-eq-high', 'sv-eq-high', v => (v > 0 ? '+' : '') + v);
+
+function saveSettings() {
+  if (editingIndex === null) return;
+  const se = seList[editingIndex];
+  se.settings.volume = parseInt(document.getElementById('s-volume').value) / 100;
+  se.settings.delay = parseInt(document.getElementById('s-delay').value);
+  se.settings.fadeIn = document.getElementById('s-fadein-on').checked;
+  se.settings.fadeInTime = parseInt(document.getElementById('s-fadein').value);
+  se.settings.fadeOut = document.getElementById('s-fadeout-on').checked;
+  se.settings.fadeOutTime = parseInt(document.getElementById('s-fadeout').value);
+  se.settings.eqLow = parseFloat(document.getElementById('s-eq-low').value);
+  se.settings.eqMid = parseFloat(document.getElementById('s-eq-mid').value);
+  se.settings.eqHigh = parseFloat(document.getElementById('s-eq-high').value);
+  closeModal();
+  renderList();
+}
+
+function closeModal() {
+  $modal.classList.remove('open');
+  editingIndex = null;
+}
+
+document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+document.getElementById('btn-close-modal2').addEventListener('click', closeModal);
+$modal.addEventListener('click', (e) => { if (e.target === $modal) closeModal(); });
+
+document.getElementById('btn-remove-se').addEventListener('click', () => {
+  if (editingIndex === null) return;
+  seList.splice(editingIndex, 1);
+  if (cursor >= seList.length) cursor = Math.max(0, seList.length - 1);
+  closeModal();
+  renderList();
+  updateStatus();
+});
+
+// ===== UTILS =====
+function fmtTime(s) {
+  if (!isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setPlayIcon(playing) {
+  const icon = document.getElementById('play-icon');
+  if (playing) {
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+    icon.setAttribute('fill', 'currentColor');
+  } else {
+    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+  }
+}
+
+function flashScreen() {
+  const el = document.createElement('div');
+  el.className = 'key-flash';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 300);
+}
+
+// ===== PWA Service Worker =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// Init
+updateStatus();
+</script>
+</body>
+</html>
