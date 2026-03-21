@@ -1,7 +1,7 @@
 {
   "name": "PenguinSoundEffectPlayer",
   "short_name": "PSEP",
-  "description": "声劇・舞台用SEプレイヤー v0.3",
+  "description": "声劇・舞台用SEプレイヤー v0.4",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#030d1a",

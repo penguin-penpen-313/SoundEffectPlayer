@@ -121,10 +121,8 @@
     .btn-transport svg{width:15px;height:15px}
     .btn-transport.primary svg{width:19px;height:19px}
     .progress-section{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
-    .progress-bar-wrap{height:6px;background:var(--border-b);border-radius:3px;cursor:pointer;position:relative;overflow:visible}
-    .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent3));border-radius:3px;width:0%;pointer-events:none;position:relative;transition:width .05s linear}
-    .progress-bar-fill::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:11px;height:11px;border-radius:50%;background:var(--accent3);box-shadow:0 0 6px var(--accent);opacity:0;transition:opacity .15s}
-    .progress-bar-wrap:hover .progress-bar-fill::after{opacity:1}
+    .progress-bar-wrap{height:6px;background:var(--border-b);border-radius:3px;cursor:default;position:relative;overflow:hidden}
+    .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent3));border-radius:3px;width:0%;pointer-events:none;position:relative}
     .progress-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text-dim)}
 
     /* MODALS */
@@ -193,7 +191,7 @@
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.3</span>
+      <span class="logo-ver">v0.4</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -239,7 +237,7 @@
       <button class="btn-transport primary" id="btn-play" title="再生 / 次へ">
         <svg viewBox="0 0 24 24" id="play-icon-svg" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       </button>
-      <button class="btn-transport" id="btn-stop" title="全停止">
+      <button class="btn-transport" id="btn-stop" title="選択中の音源を停止">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
       </button>
     </div>
@@ -290,6 +288,32 @@
           <span class="setting-label">再生速度</span>
           <input type="range" class="setting-slider" id="s-speed" min="25" max="400" step="5" value="100" />
           <span class="setting-value" id="sv-speed" data-slider="s-speed" data-fmt="speed">1.00×</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">速度変更時</span>
+          <div class="toggle-wrap"><input type="checkbox" class="toggle" id="s-preserve-pitch" /><span class="toggle-label">ピッチを維持する</span></div>
+          <span></span>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-group-title">PITCH</div>
+        <div class="setting-row">
+          <span class="setting-label">ピッチ調整</span>
+          <input type="range" class="setting-slider" id="s-pitch" min="-1200" max="1200" step="10" value="0" />
+          <span class="setting-value" id="sv-pitch" data-slider="s-pitch" data-fmt="cent">0¢</span>
+        </div>
+      </div>
+      <div class="setting-group">
+        <div class="setting-group-title">LOOP</div>
+        <div class="setting-row">
+          <span class="setting-label">ループ</span>
+          <div class="toggle-wrap"><input type="checkbox" class="toggle" id="s-loop-on" /><span class="toggle-label">有効</span></div>
+          <span></span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">ループ回数</span>
+          <input type="number" class="setting-value-input" id="s-loop-count" min="1" step="1" placeholder="∞" style="width:100%;text-align:left;font-size:12px;padding:3px 6px" />
+          <span class="setting-label" style="font-size:10px;color:var(--text-dim)">空=無限</span>
         </div>
       </div>
       <div class="setting-group">
@@ -381,7 +405,7 @@
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.3
+// PenguinSoundEffectPlayer  v0.4
 // =============================================
 
 // ===== IndexedDB =====
@@ -429,15 +453,20 @@ let editingIdx = null;
 const masterVol = { v: 0.8 };
 
 function defaultSettings() {
-  return { volume:1, pan:0, delay:0, speed:1, fadeIn:false, fadeInTime:0, fadeOut:false, fadeOutTime:0, eqLow:0, eqMid:0, eqHigh:0 };
+  return { volume:1, pan:0, delay:0, speed:1, preservesPitch:false,
+           pitch:0, loop:false, loopCount:null,
+           fadeIn:false, fadeInTime:0, fadeOut:false, fadeOutTime:0, eqLow:0, eqMid:0, eqHigh:0 };
 }
 
 // ===== Keybinds =====
-const KB_DEFAULT = { play:['Enter','ArrowRight'], prev:['ArrowLeft'], volUp:['ArrowUp'], volDown:['ArrowDown'] };
-const KB_LABELS  = { play:'再生 / 次へ', prev:'前へ / 巻き戻し', volUp:'音量 +5', volDown:'音量 −5' };
+// KB: 'play' は Enter(固定) + playKey(変更可) の2キー
+// playKey のみキーバインド変更画面で変更できる
+const KB_DEFAULT = { playKey:['ArrowRight'], prev:['ArrowLeft'], volUp:['ArrowUp'], volDown:['ArrowDown'] };
+const KB_LABELS  = { playKey:'再生キー (→変更可 / Enterは固定)', prev:'前へ / 巻き戻し', volUp:'音量 +5', volDown:'音量 −5' };
 let kb = JSON.parse(JSON.stringify(KB_DEFAULT));
-function loadKB() { try { const s=localStorage.getItem('psep_kb'); if(s) kb=JSON.parse(s); } catch{} }
+function loadKB() { try { const s=localStorage.getItem('psep_kb'); if(s) { const p=JSON.parse(s); /* migrate old 'play' key */ if(p.play&&!p.playKey){p.playKey=p.play.filter(k=>k!=='Enter');delete p.play;} kb=p; } } catch{} }
 function saveKB() { localStorage.setItem('psep_kb', JSON.stringify(kb)); }
+function kbMatchPlay(e) { return e.key==='Enter' || (kb.playKey||[]).includes(e.key); }
 function kbMatch(action, e) { return (kb[action]||[]).includes(e.key); }
 function kbLabel(k) { return ({ArrowRight:'→',ArrowLeft:'←',ArrowUp:'↑',ArrowDown:'↓',Enter:'Enter',' ':'Space'})[k]||k; }
 
@@ -461,7 +490,16 @@ const $hints  = document.getElementById('key-hints-bar');
 // ===== Key hints =====
 function renderHints() {
   $hints.innerHTML = '';
-  ['play','prev','volUp','volDown'].forEach(action => {
+  // 再生キー：Enter固定 + playKey
+  const playKeys = ['Enter', ...(kb.playKey||[])];
+  const playDiv = document.createElement('div');
+  playDiv.className = 'key-hint';
+  playDiv.title = 'クリックでキーバインド変更';
+  playDiv.innerHTML = playKeys.map(k=>`<kbd>${kbLabel(k)}</kbd>`).join('') + ' 再生 / 次へ';
+  playDiv.onclick = openKbModal;
+  $hints.appendChild(playDiv);
+
+  ['prev','volUp','volDown'].forEach(action => {
     const div = document.createElement('div');
     div.className = 'key-hint';
     div.title = 'クリックでキーバインド変更';
@@ -654,57 +692,85 @@ async function playIdx(idx) {
   let buf = se.buffer;
   if (!buf) { buf = await ctx.decodeAudioData(se.ab.slice(0)); se.buffer = buf; }
 
-  const source = ctx.createBufferSource();
-  source.buffer = buf;
-  source.playbackRate.value = s.speed;
+  // ループ回数管理
+  const totalLoops = (s.loop && s.loopCount && s.loopCount > 0) ? s.loopCount : (s.loop ? Infinity : 1);
+  let loopsDone = 0;
 
-  const gainNode = ctx.createGain();
-  gainNode.gain.value = s.volume * masterVol.v;
+  const startOneShot = (onFinished) => {
+    const source = ctx.createBufferSource();
+    source.buffer = buf;
+    source.playbackRate.value = s.speed;
+    // preservesPitch: ブラウザAPIがあれば設定
+    if ('preservesPitch' in source) source.preservesPitch = !!s.preservesPitch;
+    else if ('mozPreservesPitch' in source) source.mozPreservesPitch = !!s.preservesPitch;
+    // ピッチ調整（detune: セント単位, preservesPitchと組み合わせ）
+    source.detune.value = s.pitch || 0;
 
-  const panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-  if (panNode) panNode.pan.value = s.pan/100;
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = s.volume * masterVol.v;
+    const panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (panNode) panNode.pan.value = s.pan/100;
+    const low = ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=200; low.gain.value=s.eqLow;
+    const mid = ctx.createBiquadFilter(); mid.type='peaking';  mid.frequency.value=1000; mid.Q.value=1; mid.gain.value=s.eqMid;
+    const hi  = ctx.createBiquadFilter(); hi.type='highshelf'; hi.frequency.value=5000; hi.gain.value=s.eqHigh;
 
-  const low = ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=200; low.gain.value=s.eqLow;
-  const mid = ctx.createBiquadFilter(); mid.type='peaking';  mid.frequency.value=1000; mid.Q.value=1; mid.gain.value=s.eqMid;
-  const hi  = ctx.createBiquadFilter(); hi.type='highshelf'; hi.frequency.value=5000; hi.gain.value=s.eqHigh;
+    source.connect(gainNode); gainNode.connect(low); low.connect(mid); mid.connect(hi);
+    if (panNode) { hi.connect(panNode); panNode.connect(ctx.destination); }
+    else hi.connect(ctx.destination);
 
-  source.connect(gainNode); gainNode.connect(low); low.connect(mid); mid.connect(hi);
-  if (panNode) { hi.connect(panNode); panNode.connect(ctx.destination); }
-  else hi.connect(ctx.destination);
+    const now   = ctx.currentTime;
+    const delay = loopsDone===0 ? s.delay/1000 : 0;
+    const dur   = buf.duration / s.speed;
 
-  const now   = ctx.currentTime;
-  const delay = s.delay/1000;
-  const dur   = buf.duration/s.speed;
-
-  if (s.fadeIn && s.fadeInTime>0) {
-    const fi = s.fadeInTime/1000;
-    gainNode.gain.setValueAtTime(0, now+delay);
-    gainNode.gain.linearRampToValueAtTime(s.volume*masterVol.v, now+delay+fi);
-  }
-  if (s.fadeOut && s.fadeOutTime>0) {
-    const fo = s.fadeOutTime/1000;
-    const fs = now+delay+dur-fo;
-    if (fs>now+delay) {
-      gainNode.gain.setValueAtTime(s.volume*masterVol.v, fs);
-      gainNode.gain.linearRampToValueAtTime(0, now+delay+dur);
+    if (loopsDone===0 && s.fadeIn && s.fadeInTime>0) {
+      const fi = s.fadeInTime/1000;
+      gainNode.gain.setValueAtTime(0, now+delay);
+      gainNode.gain.linearRampToValueAtTime(s.volume*masterVol.v, now+delay+fi);
     }
-  }
-
-  source.start(now+delay);
-
-  const entry = { source, gainNode, panNode, idx, seId:se.id, startAt:now+delay, duration:dur };
-  activeSources.push(entry);
-
-  source.onended = () => {
-    const j = activeSources.indexOf(entry);
-    if (j!==-1) activeSources.splice(j,1);
-    if (entry.idx===cursor && !activeSources.some(en=>en.idx===cursor)) {
-      if (cursor<seList.length-1) cursor++;
+    const isLastLoop = (loopsDone === totalLoops - 1);
+    if (isLastLoop && s.fadeOut && s.fadeOutTime>0) {
+      const fo = s.fadeOutTime/1000;
+      const fs = now+delay+dur-fo;
+      if (fs>now+delay) {
+        gainNode.gain.setValueAtTime(s.volume*masterVol.v, fs);
+        gainNode.gain.linearRampToValueAtTime(0, now+delay+dur);
+      }
     }
-    renderList(); updateNP();
-    if (!activeSources.length) { clearInterval(progressTimer); $fill.style.width='0%'; $tCur.textContent='0:00'; }
+
+    source.start(now+delay);
+
+    const entry = { source, gainNode, panNode, idx, seId:se.id, startAt:now+delay, duration:dur };
+    activeSources.push(entry);
+
+    source.onended = () => {
+      const j = activeSources.indexOf(entry);
+      if (j!==-1) activeSources.splice(j,1);
+
+      loopsDone++;
+      if (loopsDone < totalLoops) {
+        // 次のループ
+        startOneShot(onFinished);
+      } else {
+        onFinished();
+      }
+    };
+
+    return entry;
   };
 
+  const onAllDone = () => {
+    // カーソルが同じインデックスで他に再生中がなければ次へ進む
+    if (!activeSources.some(en=>en.idx===idx)) {
+      if (idx===cursor && cursor<seList.length-1) cursor++;
+    }
+    renderList(); updateNP();
+    if (!activeSources.length) {
+      clearInterval(progressTimer);
+      $fill.style.width='0%'; $tCur.textContent='0:00';
+    }
+  };
+
+  startOneShot(onAllDone);
   renderList(); updateNP(); startProgress();
   flashScreen();
 }
@@ -712,70 +778,36 @@ async function playIdx(idx) {
 function stopAll() {
   activeSources.forEach(e=>{ try{e.source.stop()}catch{} });
   activeSources=[];
-  clearInterval(progressTimer);
-  $fill.style.width='0%'; $tCur.textContent='0:00';
   renderList(); updateNP();
 }
 
 function stopIdx(idx) {
-  activeSources.filter(e=>e.idx===idx).forEach(e=>{ try{e.source.stop()}catch{} });
-}
-
-function seekCursor(pct) {
-  const entries = activeSources.filter(e=>e.idx===cursor);
-  if (!entries.length) return;
-  const entry = entries[entries.length-1];
-  const se = seList[cursor];
-  if (!se||!se.buffer) return;
-  const newOffset = pct * entry.duration;
-
-  try { entry.source.stop(); } catch{}
-  const j = activeSources.indexOf(entry);
-  if (j!==-1) activeSources.splice(j,1);
-
-  const ctx = ensureCtx();
-  const s   = se.settings;
-  const source = ctx.createBufferSource();
-  source.buffer = se.buffer;
-  source.playbackRate.value = s.speed;
-
-  const gainNode = ctx.createGain();
-  gainNode.gain.value = s.volume * masterVol.v;
-  const panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-  if (panNode) panNode.pan.value = s.pan/100;
-  const low = ctx.createBiquadFilter(); low.type='lowshelf'; low.frequency.value=200; low.gain.value=s.eqLow;
-  const mid = ctx.createBiquadFilter(); mid.type='peaking';  mid.frequency.value=1000; mid.Q.value=1; mid.gain.value=s.eqMid;
-  const hi  = ctx.createBiquadFilter(); hi.type='highshelf'; hi.frequency.value=5000; hi.gain.value=s.eqHigh;
-  source.connect(gainNode); gainNode.connect(low); low.connect(mid); mid.connect(hi);
-  if (panNode) { hi.connect(panNode); panNode.connect(ctx.destination); } else hi.connect(ctx.destination);
-
-  const now = ctx.currentTime;
-  source.start(now, newOffset*s.speed);
-  const ne = { source, gainNode, panNode, idx:cursor, seId:se.id, startAt:now-newOffset, duration:entry.duration };
-  activeSources.push(ne);
-
-  source.onended = () => {
-    const k = activeSources.indexOf(ne);
-    if (k!==-1) activeSources.splice(k,1);
-    if (ne.idx===cursor && !activeSources.some(en=>en.idx===cursor)) {
-      if (cursor<seList.length-1) cursor++;
-    }
-    renderList(); updateNP();
-    if (!activeSources.length) { clearInterval(progressTimer); $fill.style.width='0%'; $tCur.textContent='0:00'; }
-  };
+  const toStop = activeSources.filter(e=>e.idx===idx);
+  toStop.forEach(e=>{ try{e.source.stop()}catch{} });
+  // 即時削除（onendedを待たない）
+  activeSources = activeSources.filter(e=>e.idx!==idx);
 }
 
 function startProgress() {
-  clearInterval(progressTimer);
-  progressTimer = setInterval(()=>{
-    const en = activeSources.filter(e=>e.idx===cursor);
-    if (!en.length||!audioCtx) return;
-    const e = en[en.length-1];
-    const elapsed = audioCtx.currentTime - e.startAt;
-    $fill.style.width = Math.min(100,(elapsed/e.duration)*100)+'%';
-    $tCur.textContent = fmtT(Math.max(0,elapsed));
-    $tTot.textContent = fmtT(e.duration);
-  }, 80);
+  if (progressTimer) return; // すでに動いていれば再起動しない
+  progressTimer = setInterval(updateProgressBar, 80);
+}
+
+function updateProgressBar() {
+  if (!audioCtx) return;
+  const en = activeSources.filter(e=>e.idx===cursor);
+  if (!en.length) {
+    // 再生中でなければ0表示（durationは維持）
+    $fill.style.width = '0%';
+    $tCur.textContent = '0:00';
+    return;
+  }
+  const e = en[en.length-1];
+  const elapsed = Math.max(0, audioCtx.currentTime - e.startAt);
+  const pct = Math.min(100, (elapsed / e.duration) * 100);
+  $fill.style.width = pct + '%';
+  $tCur.textContent = fmtT(elapsed);
+  $tTot.textContent = fmtT(e.duration);
 }
 
 function updateNP() {
@@ -783,14 +815,21 @@ function updateNP() {
   if (se) {
     $npName.textContent = se.name;
     $npName.classList.remove('idle');
-    // Show duration of cursor item, or playing time if it's playing
     const en = activeSources.filter(e=>e.idx===cursor);
-    if (!en.length) $tTot.textContent = fmtT(se.duration);
+    if (!en.length) {
+      $tTot.textContent = fmtT(se.duration);
+      $fill.style.width = '0%';
+      $tCur.textContent = '0:00';
+    }
   } else {
     $npName.textContent = '- - -';
     $npName.classList.add('idle');
     $tTot.textContent = '0:00';
+    $fill.style.width = '0%';
+    $tCur.textContent = '0:00';
   }
+  // プログレスタイマーが動いていなければ開始
+  if (!progressTimer) startProgress();
 }
 
 // ===== Keyboard =====
@@ -799,7 +838,7 @@ let prevPressedOnce = false;
 document.addEventListener('keydown', e => {
   if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
   if (document.querySelector('.modal-overlay.open')) return;
-  if (kbMatch('play',e)) {
+  if (kbMatchPlay(e)) {
     e.preventDefault();
     playIdx(cursor);
     if (cursor<seList.length-1) cursor++;
@@ -809,7 +848,9 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     const playing = activeSources.filter(en=>en.idx===cursor);
     if (playing.length && !prevPressedOnce) {
-      seekCursor(0);
+      // 巻き戻し：カーソル音源を停止して再度0から再生
+      stopIdx(cursor);
+      playIdx(cursor);
       prevPressedOnce = true;
     } else {
       stopIdx(cursor);
@@ -836,7 +877,8 @@ document.getElementById('btn-play').addEventListener('click', ()=>{
 document.getElementById('btn-prev').addEventListener('click', ()=>{
   const playing = activeSources.filter(en=>en.idx===cursor);
   if (playing.length && !prevPressedOnce) {
-    seekCursor(0);
+    stopIdx(cursor);
+    playIdx(cursor);
     prevPressedOnce = true;
   } else {
     stopIdx(cursor);
@@ -845,28 +887,10 @@ document.getElementById('btn-prev').addEventListener('click', ()=>{
     renderList(); updateNP();
   }
 });
-document.getElementById('btn-stop').addEventListener('click', stopAll);
-
-// ===== Seekbar =====
-let seeking = false;
-function seekPct(e) {
-  const r = $wrap.getBoundingClientRect();
-  return Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
-}
-$wrap.addEventListener('mousedown', e => {
-  seeking = true;
-  $fill.style.width = seekPct(e)*100+'%';
-});
-document.addEventListener('mousemove', e => {
-  if (!seeking) return;
-  $fill.style.width = seekPct(e)*100+'%';
-});
-document.addEventListener('mouseup', e => {
-  if (!seeking) return;
-  seeking = false;
-  const p = seekPct(e);
-  if (activeSources.some(en=>en.idx===cursor)) seekCursor(p);
-  else if (seList[cursor]) $tCur.textContent = fmtT(p*seList[cursor].duration);
+// 停止ボタン：選択中の音源のみ停止
+document.getElementById('btn-stop').addEventListener('click', ()=>{
+  stopIdx(cursor);
+  renderList(); updateNP();
 });
 
 // ===== Master Volume =====
@@ -906,6 +930,7 @@ function fmtVal(fmt, v) {
   if (fmt==='db')    return (v>0?'+':'')+v;
   if (fmt==='pan')   return v==0?'C':v<0?'L'+Math.abs(v):'R'+v;
   if (fmt==='speed') return (v/100).toFixed(2)+'×';
+  if (fmt==='cent')  return (v>0?'+':'')+v+'¢';
   return v;
 }
 
@@ -973,6 +998,11 @@ function openSettings(idx) {
   set('s-pan', s.pan);
   set('s-delay', s.delay);
   set('s-speed', Math.round(s.speed*100));
+  document.getElementById('s-preserve-pitch').checked = !!s.preservesPitch;
+  set('s-pitch', s.pitch||0);
+  document.getElementById('s-loop-on').checked = !!s.loop;
+  const lc = document.getElementById('s-loop-count');
+  lc.value = (s.loopCount && s.loopCount > 0) ? s.loopCount : '';
   document.getElementById('s-fadein-on').checked=s.fadeIn;
   set('s-fadein', s.fadeInTime);
   document.getElementById('s-fadeout-on').checked=s.fadeOut;
@@ -988,6 +1018,11 @@ async function saveSettings() {
   se.settings.pan      = parseInt(document.getElementById('s-pan').value);
   se.settings.delay    = parseInt(document.getElementById('s-delay').value);
   se.settings.speed    = parseInt(document.getElementById('s-speed').value)/100;
+  se.settings.preservesPitch = document.getElementById('s-preserve-pitch').checked;
+  se.settings.pitch    = parseInt(document.getElementById('s-pitch').value);
+  se.settings.loop     = document.getElementById('s-loop-on').checked;
+  const lcVal = document.getElementById('s-loop-count').value.trim();
+  se.settings.loopCount = (lcVal !== '' && !isNaN(parseInt(lcVal)) && parseInt(lcVal) > 0) ? parseInt(lcVal) : null;
   se.settings.fadeIn   = document.getElementById('s-fadein-on').checked;
   se.settings.fadeInTime  = parseInt(document.getElementById('s-fadein').value);
   se.settings.fadeOut  = document.getElementById('s-fadeout-on').checked;
@@ -1002,6 +1037,10 @@ async function saveSettings() {
 function resetSett() {
   const set=(id,v)=>{ const el=document.getElementById(id); if(el){el.value=v;el.dispatchEvent(new Event('input'));} };
   set('s-volume',100); set('s-pan',0); set('s-delay',0); set('s-speed',100);
+  document.getElementById('s-preserve-pitch').checked=false;
+  set('s-pitch',0);
+  document.getElementById('s-loop-on').checked=false;
+  document.getElementById('s-loop-count').value='';
   document.getElementById('s-fadein-on').checked=false; set('s-fadein',0);
   document.getElementById('s-fadeout-on').checked=false; set('s-fadeout',0);
   set('s-eq-low',0); set('s-eq-mid',0); set('s-eq-high',0);
@@ -1036,13 +1075,26 @@ function openKbModal() {
 
 function renderKbTable() {
   const t = document.getElementById('keybind-table');
-  t.innerHTML = `<thead><tr><th>アクション</th><th>現在のキー</th><th></th></tr></thead><tbody>${
-    Object.keys(KB_LABELS).map(a=>`
-      <tr>
-        <td>${KB_LABELS[a]}</td>
-        <td>${(kb[a]||[]).map(k=>`<kbd>${kbLabel(k)}</kbd>`).join(' ')}</td>
-        <td><button class="btn-edit-kb" data-action="${a}">変更</button></td>
-      </tr>`).join('')
+  // 再生アクションの行は特別扱い（Enter固定 + playKey変更可）
+  const rows = [
+    { action:'playKey', label:'再生キー (追加キー)', note:'Enterは常に有効・変更不可' },
+    { action:'prev',    label:KB_LABELS.prev,    note:'' },
+    { action:'volUp',   label:KB_LABELS.volUp,   note:'' },
+    { action:'volDown', label:KB_LABELS.volDown, note:'' },
+  ];
+  t.innerHTML = `<thead><tr><th>アクション</th><th>キー</th><th></th></tr></thead><tbody>${
+    rows.map(r => {
+      const keys = r.action==='playKey'
+        ? [`<kbd style="opacity:.5">Enter</kbd> <span style="font-size:9px;color:var(--text-dim)">(固定)</span>`,
+           ...(kb.playKey||[]).map(k=>`<kbd>${kbLabel(k)}</kbd>`)].join(' ')
+        : (kb[r.action]||[]).map(k=>`<kbd>${kbLabel(k)}</kbd>`).join(' ');
+      const note = r.note ? `<br><span style="font-size:10px;color:var(--text-dim)">${r.note}</span>` : '';
+      return `<tr>
+        <td>${r.label}${note}</td>
+        <td>${keys}</td>
+        <td><button class="btn-edit-kb" data-action="${r.action}">変更</button></td>
+      </tr>`;
+    }).join('')
   }</tbody>`;
   t.querySelectorAll('.btn-edit-kb').forEach(btn => {
     btn.addEventListener('click', ()=>{
@@ -1056,7 +1108,7 @@ function renderKbTable() {
 document.addEventListener('keydown', e=>{
   if (!recAction) return;
   if (e.key==='Escape') { recBtn.classList.remove('recording'); recBtn.textContent='変更'; recAction=null; recBtn=null; return; }
-  // Enterキーはキーバインドに割り当て不可
+  // Enterはすべてのアクションで割り当て不可（再生キーはEnter固定なので衝突防止）
   if (e.key==='Enter') return;
   e.preventDefault(); e.stopPropagation();
   kb[recAction]=[e.key]; saveKB(); renderHints();
