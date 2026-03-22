@@ -237,7 +237,17 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
 .group-child .item-progress-wrap{margin:0 7px 2px;height:2px}
 .group-child .item-progress-time{padding:0 7px 2px}
 
-/* ── FLOATING PLAY BUTTON ── */
+/* ── drop sentinel（先頭・末尾ドロップゾーン） ── */
+.drop-sentinel{
+  height:14px;width:100%;border-radius:4px;
+  border:2px dashed transparent;
+  transition:border-color .15s,background .15s;
+  box-sizing:border-box;
+}
+.drop-sentinel.drag-over-sentinel{
+  border-color:var(--accent2);
+  background:rgba(0,180,216,.07);
+}
 #fab-play{
   position:fixed;bottom:24px;right:24px;
   width:64px;height:64px;
@@ -339,7 +349,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.3</span>
+      <span class="logo-ver">v0.6.4</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -538,7 +548,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.3
+// PenguinSoundEffectPlayer  v0.6.4
 // =============================================
 
 // ===== IndexedDB =====
@@ -802,11 +812,68 @@ function addToGroup(group, se){
 function renderList(){
   $empty.style.display=seList.length?'none':'flex';
   $list.innerHTML='';
+
+  // 先頭センチネル（リスト最上部へのドロップ用）
+  $list.appendChild(makeSentinel('top'));
+
   seList.forEach((item,i)=>{
-    if(item.type==='se')       $list.appendChild(renderSeItem(item,i));
+    if(item.type==='se')         $list.appendChild(renderSeItem(item,i));
     else if(item.type==='group') $list.appendChild(renderGroupItem(item,i));
   });
+
+  // 末尾センチネル（リスト最下部へのドロップ用）
+  $list.appendChild(makeSentinel('bottom'));
+
   updateFabIcon();
+}
+
+function makeSentinel(pos){
+  const div=document.createElement('div');
+  div.className='drop-sentinel';
+  div.dataset.sentinel=pos;
+  div.addEventListener('dragover',e=>{
+    e.preventDefault();
+    clearDragOver();
+    div.classList.add('drag-over-sentinel');
+  });
+  div.addEventListener('dragleave',()=>div.classList.remove('drag-over-sentinel'));
+  div.addEventListener('drop',e=>{
+    e.preventDefault();
+    div.classList.remove('drag-over-sentinel');
+    clearDragOver();
+    let dragData;
+    try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
+    const insertAt = pos==='top' ? 0 : seList.length;
+    dropToPosition(dragData, insertAt);
+  });
+  return div;
+}
+
+function dropToPosition(dragData, insertAt){
+  if(dragData.type==='child'){
+    // 子音源をグループから外してリストの指定位置へ
+    const {childId,fromGroupIdx}=dragData;
+    const fromGroup=seList[fromGroupIdx];
+    if(!fromGroup||fromGroup.type!=='group') return;
+    const childIdx=fromGroup.children.findIndex(c=>c.id===childId);
+    if(childIdx===-1) return;
+    const child=fromGroup.children.splice(childIdx,1)[0];
+    if(fromGroup.children.length===0) seList.splice(fromGroupIdx,1);
+    const pos=Math.max(0,Math.min(seList.length,insertAt));
+    seList.splice(pos,0,child);
+    cursor=pos;
+    saveAll(); renderList(); return;
+  }
+  if(dragData.type==='se'||dragData.type==='group'){
+    const fromIdx=dragData.idx;
+    if(fromIdx<0||fromIdx>=seList.length) return;
+    const moved=seList.splice(fromIdx,1)[0];
+    // splice後にinsertAtを補正
+    const pos=insertAt>fromIdx ? Math.max(0,insertAt-1) : Math.max(0,Math.min(seList.length,insertAt));
+    seList.splice(pos,0,moved);
+    cursor=pos;
+    saveAll(); renderList();
+  }
 }
 
 function renderSeItem(se,idx){
@@ -1002,11 +1069,25 @@ function renderGroupItem(group,idx){
       childEl.classList.add('dragging');
     });
     childEl.addEventListener('dragend',()=>{childEl.classList.remove('dragging');clearDragOver();});
-    // 子音源：グループ内ドロップは無視
-    childEl.addEventListener('dragover',e=>{e.preventDefault();});
+    // 子音源エリアのdragover：子音源ドラッグ中は無視、SEドラッグ中はグループに伝播させる
+    childEl.addEventListener('dragover',e=>{
+      let dragType='';
+      try{ dragType=JSON.parse(e.dataTransfer.types.includes('text/plain')?'{}':'{}').type||''; }catch{}
+      // 常にpreventDefaultしてdropを受け付け可能にする
+      e.preventDefault();
+      // グループ全体にdrag-overを付けてハイライト（伝播はさせない）
+      clearDragOver();
+      el.classList.add('drag-over');
+    });
     childEl.addEventListener('drop',e=>{
       e.preventDefault();
-      e.stopPropagation(); // グループのdropに伝播させない（グループ内ドロップは何もしない）
+      // ドロップデータを確認し、子音源からのドラッグなら何もしない
+      let dragData;
+      try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
+      if(dragData.type==='child') return; // 同グループ内の並べ替えは無効
+      // SE や group からのドロップ → グループのdropハンドラに委譲
+      e.stopPropagation();
+      handleDrop(e,{type:'group',idx});
     });
 
     childrenEl.appendChild(childEl);
@@ -1199,7 +1280,10 @@ async function playSe(se){
   const s=se.settings;
   const totalLoops=(s.loop&&s.loopCount&&s.loopCount>0)?s.loopCount:(s.loop?Infinity:1);
   let loopsDone=0;
+  let stopped=false; // 停止フラグ
+
   const startOneShot=(onFinished)=>{
+    if(stopped) return; // 停止済みなら新しいsourceを作らない
     const source=ctx.createBufferSource();
     source.buffer=buf;
     source.playbackRate.value=s.speed;
@@ -1227,10 +1311,12 @@ async function playSe(se){
       if(fs>now+delay){gain.gain.setValueAtTime(s.volume*masterVol.v,fs);gain.gain.linearRampToValueAtTime(0,now+delay+dur);}
     }
     source.start(now+delay);
-    const entry={source,gainNode:gain,panNode:pan,seId:se.id,startAt:now+delay,duration:dur};
+    const entry={source,gainNode:gain,panNode:pan,seId:se.id,startAt:now+delay,duration:dur,
+                 stop:()=>{ stopped=true; try{source.stop();}catch{} }}; // stopメソッドを持つ
     activeSources.push(entry);
     source.onended=()=>{
       const j=activeSources.indexOf(entry);if(j!==-1)activeSources.splice(j,1);
+      if(stopped) return; // 停止済みならループしない
       loopsDone++;
       if(loopsDone<totalLoops) startOneShot(onFinished);
       else onFinished();
@@ -1244,7 +1330,10 @@ async function playGroup(group){
 }
 
 function stopSeById(seId){
-  activeSources.filter(e=>e.seId===seId).forEach(e=>{try{e.source.stop()}catch{}});
+  activeSources.filter(e=>e.seId===seId).forEach(e=>{
+    if(typeof e.stop==='function') e.stop(); // 停止フラグを立ててからsource.stop()
+    else { try{e.source.stop()}catch{} }
+  });
   activeSources=activeSources.filter(e=>e.seId!==seId);
 }
 
