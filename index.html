@@ -197,16 +197,35 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
   transition:border-color .1s,background .1s,margin-left .2s;
 }
 .group-child:hover{border-color:var(--border-b);background:var(--surface3)}
-.group-child.playing{border-color:var(--accent);background:var(--playing);animation:icePulse 2s ease-in-out infinite}
-.group-child-row{display:grid;grid-template-columns:1fr 54px 24px 24px;
-  align-items:center;gap:6px;padding:5px 7px}
+.group-child.playing{border-color:var(--accent2);background:rgba(0,180,216,.07)}
+.group-child.dragging{opacity:.3;border-style:dashed}
+.group-child.drag-over-child{outline:2px solid var(--accent2);outline-offset:-2px}
+/* 子音源のrow: 名前 | wf | 再生btn | 設定btn */
+.group-child-row{display:grid;grid-template-columns:1fr 36px 32px 30px;
+  align-items:center;gap:5px;padding:5px 7px}
 .group-child-name{font-family:var(--sans);font-size:12px;color:var(--text-bright);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.group-child.playing .group-child-name{color:var(--accent3)}
+.group-child.playing .group-child-name{color:var(--accent4)}
 .group-child-meta{font-family:var(--mono);font-size:9px;color:var(--text-dim);white-space:nowrap}
 /* delay indicator line */
 .group-child-delay-bar{position:absolute;left:0;top:0;height:100%;
   background:rgba(0,180,216,.06);border-right:1px solid rgba(0,180,216,.2);pointer-events:none}
+/* 子音源の再生ボタン */
+.btn-play-child{background:none;border:1px solid var(--border-b);border-radius:4px;
+  color:var(--text-dim);width:32px;height:32px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
+.btn-play-child:hover{border-color:var(--accent);color:var(--accent)}
+.btn-play-child.is-playing{border-color:var(--accent2);color:var(--accent2);background:rgba(0,180,216,.1)}
+.btn-play-child svg{width:13px;height:13px}
+/* 子音源の設定ボタン */
+.btn-child-settings{background:none;border:1px solid var(--border);border-radius:4px;
+  color:var(--text-dim);width:30px;height:30px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
+.btn-child-settings:hover{border-color:var(--accent2);color:var(--accent2)}
+.btn-child-settings svg{width:12px;height:12px}
+/* 子音源プログレスバー（さらにコンパクト） */
+.group-child .item-progress-wrap{margin:0 7px 2px;height:2px}
+.group-child .item-progress-time{padding:0 7px 2px}
 
 /* ── FLOATING PLAY BUTTON ── */
 #fab-play{
@@ -310,7 +329,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.1</span>
+      <span class="logo-ver">v0.6.2</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -509,7 +528,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.1
+// PenguinSoundEffectPlayer  v0.6.2
 // =============================================
 
 // ===== IndexedDB =====
@@ -866,41 +885,8 @@ function renderGroupItem(group,idx){
   // Compute max delay for relative positioning
   const maxDelay=Math.max(0,...group.children.map(c=>c.settings.delay||0));
 
-  const childrenHtml=group.children.map(c=>{
-    const cp=activeSources.some(s=>s.seId===c.id);
-    const delay=c.settings.delay||0;
-    // Relative indent: 0-40% of item width
-    const indentPct=maxDelay>0?Math.round((delay/maxDelay)*38):0;
-    return `
-      <div class="group-child${cp?' playing':''}" data-child-id="${c.id}" data-group-id="${group.id}" style="margin-left:${indentPct}%">
-        ${delay>0?`<div class="group-child-delay-bar" style="width:${indentPct}%"></div>`:''}
-        <div class="group-child-row">
-          <div>
-            <div class="group-child-name">${esc(c.name)}</div>
-            <div class="se-meta">
-              <span>${fmtT(c.duration)}</span>
-              ${delay>0?`<span>⏱${delay}ms</span>`:''}
-              ${c.settings.speed!==1?`<span>×${c.settings.speed.toFixed(2)}</span>`:''}
-            </div>
-          </div>
-          ${wfSvg(c.wf)}
-          <button class="btn-settings btn-child-settings" data-child-id="${c.id}" title="設定">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
-          </button>
-        </div>
-        <div class="item-progress-wrap">
-          <div class="item-progress-track"></div>
-          <div class="item-progress-fill" id="pf-${c.id}" style="width:${getProgressPct(c.id)}%"></div>
-        </div>
-        <div class="item-progress-time">
-          <span id="pt-cur-${c.id}">${getProgressCur(c.id)}</span>
-          <span id="pt-tot-${c.id}">${fmtT(c.duration)}</span>
-        </div>
-      </div>`;
-  }).join('');
-
   el.innerHTML=`
-    <div class="group-header">
+    <div class="group-header" draggable="true">
       <div class="group-drag-handle"></div>
       <span class="group-icon">⬡</span>
       <span class="group-label">GROUP</span>
@@ -912,54 +898,121 @@ function renderGroupItem(group,idx){
       </button>
       <button class="btn-ungroup" title="グループ解除">✕</button>
     </div>
-    <div class="group-children">${childrenHtml}</div>`;
+    <div class="group-children"></div>`;
 
-  // Group header click: select
+  // Build children DOM via JS (so we can attach events)
+  const childrenEl=el.querySelector('.group-children');
+  group.children.forEach(c=>{
+    const cp=activeSources.some(s=>s.seId===c.id);
+    const delay=c.settings.delay||0;
+    const indentPct=maxDelay>0?Math.round((delay/maxDelay)*38):0;
+
+    const childEl=document.createElement('div');
+    childEl.className='group-child'+(cp?' playing':'');
+    childEl.dataset.childId=c.id;
+    childEl.dataset.groupId=group.id;
+    childEl.style.marginLeft=indentPct+'%';
+    childEl.draggable=true;
+
+    childEl.innerHTML=`
+      ${delay>0?`<div class="group-child-delay-bar" style="width:${indentPct}%"></div>`:''}
+      <div class="group-child-row">
+        <div>
+          <div class="group-child-name">${esc(c.name)}</div>
+          <div class="se-meta">
+            <span>${fmtT(c.duration)}</span>
+            ${delay>0?`<span>⏱${delay}ms</span>`:''}
+            ${c.settings.speed!==1?`<span>×${c.settings.speed.toFixed(2)}</span>`:''}
+          </div>
+        </div>
+        ${wfSvg(c.wf)}
+        <button class="btn-play-child${cp?' is-playing':''}" title="再生/停止">
+          ${cp
+            ?'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>'
+            :'<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>'}
+        </button>
+        <button class="btn-child-settings" data-child-id="${c.id}" title="設定">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
+        </button>
+      </div>
+      <div class="item-progress-wrap">
+        <div class="item-progress-track"></div>
+        <div class="item-progress-fill" id="pf-${c.id}" style="width:${getProgressPct(c.id)}%"></div>
+      </div>
+      <div class="item-progress-time">
+        <span id="pt-cur-${c.id}">${getProgressCur(c.id)}</span>
+        <span id="pt-tot-${c.id}">${fmtT(c.duration)}</span>
+      </div>`;
+
+    // 子音源：再生/停止ボタン
+    childEl.querySelector('.btn-play-child').addEventListener('click',e=>{
+      e.stopPropagation();
+      togglePlaySe(c,idx);
+    });
+    // 子音源：設定ボタン
+    childEl.querySelector('.btn-child-settings').addEventListener('click',e=>{
+      e.stopPropagation();
+      openSettings(c.id);
+    });
+    // 子音源：クリックで再生（ボタン以外）
+    childEl.addEventListener('click',e=>{
+      if(e.target.closest('.btn-play-child')||e.target.closest('.btn-child-settings')) return;
+      togglePlaySe(c,idx);
+    });
+
+    // 子音源：ドラッグ開始
+    childEl.addEventListener('dragstart',e=>{
+      e.stopPropagation(); // グループ全体のdragstartを止める
+      e.dataTransfer.setData('text/plain',JSON.stringify({type:'child',childId:c.id,fromGroupIdx:idx}));
+      childEl.classList.add('dragging');
+    });
+    childEl.addEventListener('dragend',()=>{childEl.classList.remove('dragging');clearDragOver();});
+    // 子音源：グループ内ドロップは無視
+    childEl.addEventListener('dragover',e=>{e.preventDefault();});
+    childEl.addEventListener('drop',e=>{
+      e.preventDefault();
+      e.stopPropagation(); // グループのdropに伝播させない（グループ内ドロップは何もしない）
+    });
+
+    childrenEl.appendChild(childEl);
+  });
+
+  // Group header: クリックで選択
   el.querySelector('.group-header').addEventListener('click',e=>{
-    if(e.target.closest('.btn-play-group')||e.target.closest('.btn-ungroup')||e.target.closest('.group-drag-handle')) return;
+    if(e.target.closest('.btn-play-group')||e.target.closest('.btn-ungroup')) return;
     cursor=idx; renderList();
   });
-  // Play group
+  // Group header: ドラッグでグループ順番変更
+  el.querySelector('.group-header').addEventListener('dragstart',e=>{
+    e.stopPropagation();
+    e.dataTransfer.setData('text/plain',JSON.stringify({type:'group',idx}));
+    el.classList.add('dragging');
+  });
+  el.querySelector('.group-header').addEventListener('dragend',()=>{
+    el.classList.remove('dragging'); clearDragOver();
+  });
+
+  // グループ再生ボタン
   el.querySelector('.btn-play-group').addEventListener('click',e=>{
     e.stopPropagation();
     togglePlayGroup(group,idx);
   });
-  // Ungroup
+  // グループ解除
   el.querySelector('.btn-ungroup').addEventListener('click',e=>{
     e.stopPropagation();
     ungroupAt(idx);
   });
-  // Child settings
-  el.querySelectorAll('.btn-child-settings').forEach(btn=>{
-    btn.addEventListener('click',e=>{
-      e.stopPropagation();
-      openSettings(btn.dataset.childId);
-    });
-  });
-  // Child click: play individual
-  el.querySelectorAll('.group-child').forEach(childEl=>{
-    childEl.addEventListener('click',e=>{
-      if(e.target.closest('.btn-child-settings')) return;
-      const se=findSeById(childEl.dataset.childId);
-      if(se) togglePlaySe(se,idx);
-    });
-  });
 
-  // Drag group — ヘッダーをつかんでドラッグ
-  el.draggable=true;
-  el.addEventListener('dragstart',e=>{
-    // ボタン類からのドラッグは無視
-    if(e.target.closest('.btn-play-group')||e.target.closest('.btn-ungroup')||e.target.closest('.btn-child-settings')) return;
-    e.dataTransfer.setData('text/plain',JSON.stringify({type:'group',idx}));
-    el.classList.add('dragging');
-  });
-  el.addEventListener('dragend',()=>{ el.classList.remove('dragging'); clearDragOver(); });
+  // グループ本体：dragover/drop（SEやGroupからのドロップを受け付ける）
   el.addEventListener('dragover',e=>{
+    // 子音源からのドラッグ中は無視
     e.preventDefault();
     clearDragOver();
     el.classList.add('drag-over');
   });
-  el.addEventListener('dragleave',e=>{ if(!el.contains(e.relatedTarget)) el.classList.remove('drag-over'); });
+  el.addEventListener('dragleave',e=>{
+    if(!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+  });
   el.addEventListener('drop',e=>handleDrop(e,{type:'group',idx}));
 
   return el;
@@ -1002,46 +1055,89 @@ function handleDrop(e, target){
   let dragData;
   try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
 
-  const fromIdx=dragData.idx;
-  const toIdx=target.idx;
-  if(fromIdx===toIdx) return;
+  // ── 子音源のドラッグ ──
+  if(dragData.type==='child'){
+    const {childId, fromGroupIdx}=dragData;
+    const targetType=target.type; // 'se' or 'group'
+    const targetIdx=target.idx;
 
-  const fromItem=seList[fromIdx];
-  const toItem  =seList[toIdx];
-  if(!fromItem||!toItem) return;
+    const fromGroup=seList[fromGroupIdx];
+    if(!fromGroup||fromGroup.type!=='group') return;
+    const childIdx=fromGroup.children.findIndex(c=>c.id===childId);
+    if(childIdx===-1) return;
+    const child=fromGroup.children[childIdx];
 
-  // SE dropped onto SE → group them
-  if(fromItem.type==='se'&&toItem.type==='se'){
-    const g=makeGroup(toItem,fromItem);
-    seList.splice(Math.max(fromIdx,toIdx),1);
-    seList.splice(Math.min(fromIdx,toIdx),1);
-    seList.splice(Math.min(fromIdx,toIdx),0,g);
-    cursor=Math.min(fromIdx,toIdx);
+    if(targetType==='group'&&targetIdx===fromGroupIdx){
+      // 同じグループ内 → 何もしない
+      return;
+    }
+
+    // グループ外（別のSEまたは別のグループ）へドロップ → グループから除外してSEとして挿入
+    fromGroup.children.splice(childIdx,1);
+    if(fromGroup.children.length===0){
+      // グループが空になったら解除
+      seList.splice(fromGroupIdx,1);
+    }
+
+    // 挿入位置を決定
+    let insertAt=targetIdx;
+    if(fromGroupIdx<=targetIdx&&fromGroup.children.length===0) insertAt--; // グループ削除分ずらす
+    insertAt=Math.max(0,Math.min(seList.length,insertAt));
+    seList.splice(insertAt,0,child);
+    cursor=insertAt;
     saveAll(); renderList();
     return;
   }
-  // SE dropped onto Group → add to group
-  if(fromItem.type==='se'&&toItem.type==='group'){
-    addToGroup(toItem,fromItem);
-    seList.splice(fromIdx,1);
-    cursor=toIdx>fromIdx?toIdx-1:toIdx;
+
+  // ── グループのドラッグ（ヘッダーから）→ 常に順番変更のみ ──
+  if(dragData.type==='group'){
+    const fromIdx=dragData.idx;
+    const toIdx=target.idx;
+    if(fromIdx===toIdx) return;
+    const moved=seList.splice(fromIdx,1)[0];
+    const ins=fromIdx<toIdx?toIdx-1:toIdx;
+    seList.splice(ins,0,moved);
+    cursor=ins;
     saveAll(); renderList();
     return;
   }
-  // Group dropped onto SE → add SE to group
-  if(fromItem.type==='group'&&toItem.type==='se'){
-    addToGroup(fromItem,toItem);
-    seList.splice(toIdx,1);
-    cursor=fromIdx>toIdx?fromIdx-1:fromIdx;
+
+  // ── SE のドラッグ ──
+  if(dragData.type==='se'){
+    const fromIdx=dragData.idx;
+    const toIdx=target.idx;
+    if(fromIdx===toIdx) return;
+    const fromItem=seList[fromIdx];
+    const toItem  =seList[toIdx];
+    if(!fromItem||!toItem) return;
+
+    // SE → SE: グループ化
+    if(fromItem.type==='se'&&toItem.type==='se'){
+      const g=makeGroup(toItem,fromItem);
+      const hi=Math.max(fromIdx,toIdx);
+      const lo=Math.min(fromIdx,toIdx);
+      seList.splice(hi,1);
+      seList.splice(lo,1);
+      seList.splice(lo,0,g);
+      cursor=lo;
+      saveAll(); renderList();
+      return;
+    }
+    // SE → Group: グループに追加
+    if(fromItem.type==='se'&&toItem.type==='group'){
+      addToGroup(toItem,fromItem);
+      seList.splice(fromIdx,1);
+      cursor=toIdx>fromIdx?toIdx-1:toIdx;
+      saveAll(); renderList();
+      return;
+    }
+    // SE → その他: 順番変更
+    const moved=seList.splice(fromIdx,1)[0];
+    const ins=fromIdx<toIdx?toIdx-1:toIdx;
+    seList.splice(ins,0,moved);
+    cursor=ins;
     saveAll(); renderList();
-    return;
   }
-  // Otherwise: reorder
-  const moved=seList.splice(fromIdx,1)[0];
-  const ins=fromIdx<toIdx?toIdx-1:toIdx;
-  seList.splice(ins,0,moved);
-  cursor=ins;
-  saveAll(); renderList();
 }
 
 function ungroupAt(idx){

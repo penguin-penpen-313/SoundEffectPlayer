@@ -1,5 +1,5 @@
 // PenguinSoundEffectPlayer Service Worker
-// v0.6.1 — cache updated
+// v0.6.2 — cache updated
 
 const CACHE_NAME = 'psep-v0.6';
 const ASSETS = ['./', './index.html', './manifest.json'];
