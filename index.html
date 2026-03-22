@@ -119,7 +119,7 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
 .se-item.drag-over{outline:2px solid var(--accent2);outline-offset:-2px}
 
 /* se-item inner layout — ボタン大型化のため列幅拡大 */
-.se-row{display:grid;grid-template-columns:24px 1fr 44px 32px 30px;
+.se-row{display:grid;grid-template-columns:24px 1fr 44px 32px 30px 28px;
   align-items:center;gap:5px;padding:6px 8px}
 .drag-handle{position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent;
   border-radius:6px 0 0 6px;cursor:grab;transition:background .15s}
@@ -148,6 +148,16 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
   justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
 .btn-settings:hover{border-color:var(--accent2);color:var(--accent2)}
 .btn-settings svg{width:13px;height:13px}
+/* 削除ボタン */
+.btn-delete-item{background:none;border:1px solid transparent;border-radius:5px;
+  color:var(--text-dim);width:28px;height:28px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0;font-size:14px;line-height:1}
+.btn-delete-item:hover{border-color:var(--danger);color:var(--danger);background:rgba(224,92,122,.08)}
+/* 子音源の削除ボタン */
+.btn-delete-child{background:none;border:1px solid transparent;border-radius:4px;
+  color:var(--text-dim);width:26px;height:26px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0;font-size:13px;line-height:1}
+.btn-delete-child:hover{border-color:var(--danger);color:var(--danger);background:rgba(224,92,122,.08)}
 
 /* ── ITEM PROGRESS BAR (コンパクト) ── */
 .item-progress-wrap{height:2px;background:transparent;position:relative;margin:0 8px 3px;border-radius:1px;overflow:hidden}
@@ -200,8 +210,8 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
 .group-child.playing{border-color:var(--accent2);background:rgba(0,180,216,.07)}
 .group-child.dragging{opacity:.3;border-style:dashed}
 .group-child.drag-over-child{outline:2px solid var(--accent2);outline-offset:-2px}
-/* 子音源のrow: 名前 | wf | 再生btn | 設定btn */
-.group-child-row{display:grid;grid-template-columns:1fr 36px 32px 30px;
+/* 子音源のrow: 名前 | wf | 再生btn | 設定btn | 削除btn */
+.group-child-row{display:grid;grid-template-columns:1fr 36px 32px 30px 26px;
   align-items:center;gap:5px;padding:5px 7px}
 .group-child-name{font-family:var(--sans);font-size:12px;color:var(--text-bright);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -329,7 +339,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.2</span>
+      <span class="logo-ver">v0.6.3</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -528,7 +538,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.2
+// PenguinSoundEffectPlayer  v0.6.3
 // =============================================
 
 // ===== IndexedDB =====
@@ -831,6 +841,7 @@ function renderSeItem(se,idx){
       <button class="btn-settings" title="設定">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
       </button>
+      <button class="btn-delete-item" title="削除">✕</button>
     </div>
     <div class="item-progress-wrap" id="pw-${se.id}">
       <div class="item-progress-track"></div>
@@ -843,7 +854,7 @@ function renderSeItem(se,idx){
 
   // Click: select
   li.addEventListener('click',e=>{
-    if(e.target.closest('.btn-settings')||e.target.closest('.drag-handle')||e.target.closest('.btn-play-item')) return;
+    if(e.target.closest('.btn-settings')||e.target.closest('.drag-handle')||e.target.closest('.btn-play-item')||e.target.closest('.btn-delete-item')) return;
     cursor=idx; renderList();
   });
   // Play btn
@@ -855,6 +866,16 @@ function renderSeItem(se,idx){
   li.querySelector('.btn-settings').addEventListener('click',e=>{
     e.stopPropagation();
     openSettings(se.id);
+  });
+  // Delete btn
+  li.querySelector('.btn-delete-item').addEventListener('click',async e=>{
+    e.stopPropagation();
+    stopSeById(se.id);
+    seList.splice(idx,1);
+    if(cursor>=seList.length) cursor=Math.max(0,seList.length-1);
+    await dbDel('audio_files',se.id);
+    await saveAll();
+    renderList(); updateFabIcon();
   });
 
   // Drag (move item)
@@ -934,6 +955,7 @@ function renderGroupItem(group,idx){
         <button class="btn-child-settings" data-child-id="${c.id}" title="設定">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M2 12h2M20 12h2M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41"/></svg>
         </button>
+        <button class="btn-delete-child" title="削除">✕</button>
       </div>
       <div class="item-progress-wrap">
         <div class="item-progress-track"></div>
@@ -956,8 +978,21 @@ function renderGroupItem(group,idx){
     });
     // 子音源：クリックで再生（ボタン以外）
     childEl.addEventListener('click',e=>{
-      if(e.target.closest('.btn-play-child')||e.target.closest('.btn-child-settings')) return;
+      if(e.target.closest('.btn-play-child')||e.target.closest('.btn-child-settings')||e.target.closest('.btn-delete-child')) return;
       togglePlaySe(c,idx);
+    });
+    // 子音源：削除ボタン
+    childEl.querySelector('.btn-delete-child').addEventListener('click',async e=>{
+      e.stopPropagation();
+      stopSeById(c.id);
+      group.children.splice(group.children.indexOf(c),1);
+      if(group.children.length===0){
+        seList.splice(idx,1);
+        if(cursor>=seList.length) cursor=Math.max(0,seList.length-1);
+      }
+      await dbDel('audio_files',c.id);
+      await saveAll();
+      renderList(); updateFabIcon();
     });
 
     // 子音源：ドラッグ開始
