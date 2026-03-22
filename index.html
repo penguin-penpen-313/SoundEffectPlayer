@@ -99,57 +99,75 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
   position:relative;overflow:hidden;
 }
 .se-item:hover{border-color:var(--border-b);background:var(--surface3)}
-.se-item.active{border-color:var(--accent2);background:var(--active)}
-.se-item.playing{border-color:var(--accent);background:var(--playing);animation:icePulse 2s ease-in-out infinite}
+/* active = 選択中 → 派手に */
+.se-item.active{
+  border-color:var(--accent3);border-width:2px;
+  background:rgba(125,216,240,.18);
+  box-shadow:0 0 18px rgba(125,216,240,.3),inset 0 0 12px rgba(125,216,240,.08);
+  animation:activePulse 2s ease-in-out infinite;
+}
+@keyframes activePulse{0%,100%{box-shadow:0 0 14px rgba(125,216,240,.25),inset 0 0 8px rgba(125,216,240,.06)}50%{box-shadow:0 0 28px rgba(125,216,240,.45),inset 0 0 16px rgba(125,216,240,.12)}}
+/* playing = 再生中 → 控えめ（バーで判別できる） */
+.se-item.playing{border-color:var(--accent2);background:rgba(0,180,216,.07)}
+.se-item.active.playing{
+  border-color:var(--accent3);border-width:2px;
+  background:rgba(125,216,240,.2);
+  box-shadow:0 0 22px rgba(125,216,240,.35),inset 0 0 14px rgba(125,216,240,.1);
+  animation:activePulse 2s ease-in-out infinite;
+}
 .se-item.dragging{opacity:.3;border-style:dashed}
 .se-item.drag-over{outline:2px solid var(--accent2);outline-offset:-2px}
-@keyframes icePulse{0%,100%{box-shadow:0 0 8px rgba(125,216,240,.1)}50%{box-shadow:0 0 20px rgba(125,216,240,.25)}}
 
-/* se-item inner layout */
-.se-row{display:grid;grid-template-columns:28px 1fr 54px 26px 24px;
-  align-items:center;gap:7px;padding:7px 9px}
+/* se-item inner layout — ボタン大型化のため列幅拡大 */
+.se-row{display:grid;grid-template-columns:24px 1fr 44px 32px 30px;
+  align-items:center;gap:5px;padding:6px 8px}
 .drag-handle{position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent;
   border-radius:6px 0 0 6px;cursor:grab;transition:background .15s}
 .se-item:hover .drag-handle{background:var(--border-b)}
-.se-item.active .drag-handle{background:var(--accent2)}
-.se-item.playing .drag-handle{background:var(--accent)}
-.se-index{font-family:var(--mono);font-size:11px;color:var(--text-dim);text-align:center}
-.se-item.active .se-index{color:var(--accent2)}
-.se-item.playing .se-index{color:var(--accent)}
+.se-item.active .drag-handle{background:var(--accent3)}
+.se-item.playing .drag-handle{background:var(--accent2)}
+.se-index{font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center}
+.se-item.active .se-index{color:var(--accent3);font-weight:700}
+.se-item.playing .se-index{color:var(--accent2)}
 .se-info{display:flex;flex-direction:column;gap:1px;overflow:hidden}
 .se-name{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--text-bright);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.se-item.active .se-name,.se-item.playing .se-name{color:var(--accent3)}
+.se-item.active .se-name{color:var(--accent3);font-weight:600}
+.se-item.playing .se-name{color:var(--accent4)}
 .se-meta{display:flex;gap:6px;font-family:var(--mono);font-size:9px;color:var(--text-dim)}
-.se-waveform{width:54px;height:18px;flex-shrink:0}
-.btn-play-item{background:none;border:1px solid var(--border-b);border-radius:4px;
-  color:var(--text-dim);width:26px;height:26px;display:flex;align-items:center;
+.se-waveform{width:44px;height:16px;flex-shrink:0}
+/* 再生ボタン・設定ボタン 大型化 */
+.btn-play-item{background:none;border:1px solid var(--border-b);border-radius:5px;
+  color:var(--text-dim);width:32px;height:32px;display:flex;align-items:center;
   justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
 .btn-play-item:hover{border-color:var(--accent);color:var(--accent)}
-.btn-play-item.is-playing{border-color:var(--accent);color:var(--accent);background:rgba(125,216,240,.12)}
-.btn-play-item svg{width:11px;height:11px}
-.btn-settings{background:none;border:1px solid var(--border);border-radius:4px;
-  color:var(--text-dim);width:24px;height:24px;display:flex;align-items:center;
+.btn-play-item.is-playing{border-color:var(--accent2);color:var(--accent2);background:rgba(0,180,216,.1)}
+.btn-play-item svg{width:14px;height:14px}
+.btn-settings{background:none;border:1px solid var(--border);border-radius:5px;
+  color:var(--text-dim);width:30px;height:30px;display:flex;align-items:center;
   justify-content:center;cursor:pointer;transition:all .12s;flex-shrink:0}
 .btn-settings:hover{border-color:var(--accent2);color:var(--accent2)}
-.btn-settings svg{width:12px;height:12px}
+.btn-settings svg{width:13px;height:13px}
 
-/* ── ITEM PROGRESS BAR ── */
-.item-progress-wrap{height:3px;background:transparent;position:relative;margin:0 9px 5px;border-radius:2px;overflow:hidden}
-.item-progress-track{position:absolute;inset:0;background:var(--border-b);border-radius:2px}
+/* ── ITEM PROGRESS BAR (コンパクト) ── */
+.item-progress-wrap{height:2px;background:transparent;position:relative;margin:0 8px 3px;border-radius:1px;overflow:hidden}
+.item-progress-track{position:absolute;inset:0;background:var(--border-b);border-radius:1px}
 .item-progress-fill{position:absolute;top:0;left:0;height:100%;width:0%;
-  background:linear-gradient(90deg,var(--accent2),var(--accent3));border-radius:2px;
-  transition:width .08s linear}
+  background:linear-gradient(90deg,var(--accent2),var(--accent3));border-radius:1px}
 .item-progress-time{display:flex;justify-content:space-between;
-  font-family:var(--mono);font-size:8px;color:var(--text-dim);padding:0 9px 4px;line-height:1}
+  font-family:var(--mono);font-size:8px;color:var(--text-dim);padding:0 8px 3px;line-height:1}
 
 /* ── GROUP ── */
 .group-item{
   background:var(--group-bg);border:1px solid var(--group-border);border-radius:8px;
   position:relative;overflow:visible;user-select:none;
 }
-.group-item.active{border-color:var(--accent2)}
-.group-item.playing{border-color:var(--accent);animation:icePulse 2s ease-in-out infinite}
+.group-item.active{
+  border-color:var(--accent3);border-width:2px;
+  box-shadow:0 0 16px rgba(125,216,240,.28),inset 0 0 10px rgba(125,216,240,.06);
+  animation:activePulse 2s ease-in-out infinite;
+}
+.group-item.playing{border-color:var(--accent2);}
 .group-item.drag-over{outline:2px solid var(--accent);outline-offset:-2px}
 .group-item.dragging{opacity:.3;border-style:dashed}
 .group-header{display:flex;align-items:center;gap:8px;padding:6px 10px;
@@ -292,7 +310,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6</span>
+      <span class="logo-ver">v0.6.1</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -491,7 +509,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6
+// PenguinSoundEffectPlayer  v0.6.1
 // =============================================
 
 // ===== IndexedDB =====
@@ -788,7 +806,7 @@ function renderSeItem(se,idx){
       ${wfSvg(se.wf)}
       <button class="btn-play-item${isPlaying?' is-playing':''}" title="再生/停止">
         ${isPlaying
-          ?'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>'
+          ?'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>'
           :'<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>'}
       </button>
       <button class="btn-settings" title="設定">
@@ -797,10 +815,10 @@ function renderSeItem(se,idx){
     </div>
     <div class="item-progress-wrap" id="pw-${se.id}">
       <div class="item-progress-track"></div>
-      <div class="item-progress-fill" id="pf-${se.id}"></div>
+      <div class="item-progress-fill" id="pf-${se.id}" style="width:${getProgressPct(se.id)}%"></div>
     </div>
     <div class="item-progress-time">
-      <span id="pt-cur-${se.id}">0:00</span>
+      <span id="pt-cur-${se.id}">${getProgressCur(se.id)}</span>
       <span id="pt-tot-${se.id}">${fmtT(se.duration)}</span>
     </div>`;
 
@@ -872,10 +890,10 @@ function renderGroupItem(group,idx){
         </div>
         <div class="item-progress-wrap">
           <div class="item-progress-track"></div>
-          <div class="item-progress-fill" id="pf-${c.id}"></div>
+          <div class="item-progress-fill" id="pf-${c.id}" style="width:${getProgressPct(c.id)}%"></div>
         </div>
         <div class="item-progress-time">
-          <span id="pt-cur-${c.id}">0:00</span>
+          <span id="pt-cur-${c.id}">${getProgressCur(c.id)}</span>
           <span id="pt-tot-${c.id}">${fmtT(c.duration)}</span>
         </div>
       </div>`;
@@ -889,7 +907,7 @@ function renderGroupItem(group,idx){
       <span class="group-count">${group.children.length} tracks</span>
       <button class="btn-play-group${isPlayingGroup?' is-playing':''}" title="グループ再生/停止">
         ${isPlayingGroup
-          ?'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>'
+          ?'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>'
           :'<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>'}
       </button>
       <button class="btn-ungroup" title="グループ解除">✕</button>
@@ -927,12 +945,13 @@ function renderGroupItem(group,idx){
     });
   });
 
-  // Drag group
+  // Drag group — ヘッダーをつかんでドラッグ
+  el.draggable=true;
   el.addEventListener('dragstart',e=>{
-    if(e.target.closest('.group-drag-handle')||e.target===el){
-      e.dataTransfer.setData('text/plain',JSON.stringify({type:'group',idx}));
-      el.classList.add('dragging');
-    }
+    // ボタン類からのドラッグは無視
+    if(e.target.closest('.btn-play-group')||e.target.closest('.btn-ungroup')||e.target.closest('.btn-child-settings')) return;
+    e.dataTransfer.setData('text/plain',JSON.stringify({type:'group',idx}));
+    el.classList.add('dragging');
   });
   el.addEventListener('dragend',()=>{ el.classList.remove('dragging'); clearDragOver(); });
   el.addEventListener('dragover',e=>{
@@ -944,6 +963,24 @@ function renderGroupItem(group,idx){
   el.addEventListener('drop',e=>handleDrop(e,{type:'group',idx}));
 
   return el;
+}
+
+// 再描画時に現在の再生位置を維持するヘルパー
+function getProgressPct(seId){
+  if(!audioCtx) return 0;
+  const entry=activeSources.find(e=>e.seId===seId);
+  if(!entry) return 0;
+  const now=audioCtx.currentTime;
+  if(now<entry.startAt) return 0;
+  return Math.min(100,(now-entry.startAt)/entry.duration*100);
+}
+function getProgressCur(seId){
+  if(!audioCtx) return '0:00';
+  const entry=activeSources.find(e=>e.seId===seId);
+  if(!entry) return '0:00';
+  const now=audioCtx.currentTime;
+  if(now<entry.startAt) return '0:00';
+  return fmtT(Math.min(entry.duration,now-entry.startAt));
 }
 
 function wfSvg(data){
@@ -1104,7 +1141,7 @@ function updateFabIcon(){
   if(cursorItem.type==='se') playing=activeSources.some(s=>s.seId===cursorItem.id);
   if(cursorItem.type==='group') playing=cursorItem.children.some(c=>activeSources.some(s=>s.seId===c.id));
   $fabIcon.innerHTML=playing
-    ?'<rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/>'
+    ?'<rect x="4" y="4" width="16" height="16" rx="2"/>'
     :'<polygon points="5 3 19 12 5 21 5 3"/>';
 }
 
