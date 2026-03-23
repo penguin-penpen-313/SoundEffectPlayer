@@ -121,11 +121,25 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
 /* se-item inner layout — ボタン大型化のため列幅拡大 */
 .se-row{display:grid;grid-template-columns:24px 1fr 44px 32px 30px 28px;
   align-items:center;gap:5px;padding:6px 8px}
-.drag-handle{position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent;
-  border-radius:6px 0 0 6px;cursor:grab;transition:background .15s}
-.se-item:hover .drag-handle{background:var(--border-b)}
-.se-item.active .drag-handle{background:var(--accent3)}
-.se-item.playing .drag-handle{background:var(--accent2)}
+.drag-handle{
+  position:absolute;left:0;top:0;bottom:0;width:14px;
+  background:transparent;
+  border-radius:6px 0 0 6px;cursor:grab;transition:background .15s;
+  display:flex;align-items:center;justify-content:center;
+}
+/* grip dots */
+.drag-handle::before{
+  content:'⠿';
+  font-size:12px;color:transparent;
+  transition:color .15s;
+  pointer-events:none;
+  line-height:1;
+}
+.se-item:hover .drag-handle{background:rgba(26,58,92,.6)}
+.se-item:hover .drag-handle::before{color:var(--text-dim)}
+.se-item.active .drag-handle{background:rgba(125,216,240,.15)}
+.se-item.active .drag-handle::before{color:var(--accent3)}
+.se-item.playing .drag-handle::before{color:var(--accent2)}
 .se-index{font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center}
 .se-item.active .se-index{color:var(--accent3);font-weight:700}
 .se-item.playing .se-index{color:var(--accent2)}
@@ -349,7 +363,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.4</span>
+      <span class="logo-ver">v0.6.5</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -548,7 +562,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.4
+// PenguinSoundEffectPlayer  v0.6.5
 // =============================================
 
 // ===== IndexedDB =====
@@ -945,12 +959,23 @@ function renderSeItem(se,idx){
     renderList(); updateFabIcon();
   });
 
-  // Drag (move item)
+  li.draggable=false; // drag-handleからのみドラッグ開始
+
+  // Drag: drag-handleを押したときだけdraggableをonにする
+  const handle=li.querySelector('.drag-handle');
+  handle.addEventListener('mousedown',()=>{ li.draggable=true; });
+  handle.addEventListener('touchstart',()=>{ li.draggable=true; },{passive:true});
+  li.addEventListener('dragend',()=>{
+    li.draggable=false;
+    li.classList.remove('dragging');
+    clearDragOver();
+  });
   li.addEventListener('dragstart',e=>{
+    if(!li.draggable) { e.preventDefault(); return; }
     e.dataTransfer.setData('text/plain',JSON.stringify({type:'se',idx}));
     li.classList.add('dragging');
   });
-  li.addEventListener('dragend',()=>{ li.classList.remove('dragging'); clearDragOver(); });
+  document.addEventListener('mouseup',()=>{ li.draggable=false; },{once:false});
   li.addEventListener('dragover',e=>{
     e.preventDefault();
     clearDragOver();
@@ -1283,12 +1308,29 @@ async function playSe(se){
   let stopped=false; // 停止フラグ
 
   const startOneShot=(onFinished)=>{
-    if(stopped) return; // 停止済みなら新しいsourceを作らない
+    if(stopped) return;
     const source=ctx.createBufferSource();
     source.buffer=buf;
-    source.playbackRate.value=s.speed;
-    if('preservesPitch' in source) source.preservesPitch=!!s.preservesPitch;
-    source.detune.value=s.pitch||0;
+
+    // ピッチ(cent)を周波数比に変換して playbackRate に乗算
+    // → 速度(s.speed)とピッチ(s.pitch)を独立して制御
+    const pitchRatio = Math.pow(2, (s.pitch||0) / 1200);
+    if(s.preservesPitch && 'preservesPitch' in source){
+      // ブラウザがpreservesPitchをサポートする場合:
+      // speedのみplaybackRateに設定し、detuneでピッチのみ変える
+      source.playbackRate.value = s.speed;
+      source.preservesPitch = true;
+      source.detune.value = s.pitch || 0;
+    } else {
+      // 非サポート or preservesPitchオフ:
+      // playbackRate = speed × pitchRatio でピッチと速度を同時に設定
+      source.playbackRate.value = s.speed * pitchRatio;
+    }
+
+    // 実際の再生時間はplaybackRateから逆算
+    const actualRate = source.playbackRate.value;
+    const dur = buf.duration / actualRate;
+
     const gain=ctx.createGain();
     gain.gain.value=s.volume*masterVol.v;
     const pan=ctx.createStereoPanner?ctx.createStereoPanner():null;
@@ -1300,7 +1342,6 @@ async function playSe(se){
     if(pan){hi.connect(pan);pan.connect(ctx.destination);}else hi.connect(ctx.destination);
     const now=ctx.currentTime;
     const delay=loopsDone===0?s.delay/1000:0;
-    const dur=buf.duration/s.speed;
     if(loopsDone===0&&s.fadeIn&&s.fadeInTime>0){
       gain.gain.setValueAtTime(0,now+delay);
       gain.gain.linearRampToValueAtTime(s.volume*masterVol.v,now+delay+s.fadeInTime/1000);
@@ -1312,11 +1353,11 @@ async function playSe(se){
     }
     source.start(now+delay);
     const entry={source,gainNode:gain,panNode:pan,seId:se.id,startAt:now+delay,duration:dur,
-                 stop:()=>{ stopped=true; try{source.stop();}catch{} }}; // stopメソッドを持つ
+                 stop:()=>{ stopped=true; try{source.stop();}catch{} }};
     activeSources.push(entry);
     source.onended=()=>{
       const j=activeSources.indexOf(entry);if(j!==-1)activeSources.splice(j,1);
-      if(stopped) return; // 停止済みならループしない
+      if(stopped) return;
       loopsDone++;
       if(loopsDone<totalLoops) startOneShot(onFinished);
       else onFinished();
