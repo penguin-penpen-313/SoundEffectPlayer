@@ -136,8 +136,11 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
 @keyframes groupHoldPulse{0%,100%{outline-color:var(--accent2)}50%{outline-color:var(--accent3)}}
 
 /* se-item inner layout */
-.se-row{display:grid;grid-template-columns:1fr 44px 32px 30px 28px;
+.se-row{display:grid;grid-template-columns:22px 1fr 44px 32px 30px 28px;
   align-items:center;gap:5px;padding:6px 8px 6px 16px}
+.se-index{font-family:var(--mono);font-size:10px;color:var(--text-dim);text-align:center;flex-shrink:0}
+.se-item.active .se-index{color:var(--accent3);font-weight:700}
+.se-item.playing .se-index{color:var(--accent2)}
 .drag-handle{position:absolute;left:0;top:0;bottom:0;width:6px;background:transparent;border-radius:6px 0 0 6px;}
 .se-item:hover .drag-handle{background:var(--border-b)}
 .se-item.active .drag-handle{background:var(--accent3)}
@@ -365,7 +368,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.6</span>
+      <span class="logo-ver">v0.6.7</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -564,7 +567,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.6
+// PenguinSoundEffectPlayer  v0.6.7
 // =============================================
 
 // ===== IndexedDB =====
@@ -904,6 +907,7 @@ function renderSeItem(se,idx){
   li.innerHTML=`
     <div class="drag-handle"></div>
     <div class="se-row">
+      <span class="se-index">${String(idx+1).padStart(2,'0')}</span>
       <div class="se-info">
         <span class="se-name">${esc(se.name)}</span>
         <div class="se-meta">
@@ -988,31 +992,26 @@ function renderSeItem(se,idx){
     const elapsed=Date.now()-dragState.startTime;
     const isSameTarget=dragState.holdTarget===li;
 
-    if(elapsed<1000||!isSameTarget){
-      // 1秒未満 or 違うアイテムに移動 → 順番変更モード
-      if(!isSameTarget){
-        // 違うアイテムに移動したらホールドリセット
-        dragState.holdTarget=li;
-        dragState.isHolding=false;
-        if(dragState.holdTimer){ clearTimeout(dragState.holdTimer); dragState.holdTimer=null; }
-        // 1秒後にグループ化モードへ移行するタイマー
-        dragState.holdTimer=setTimeout(()=>{
-          if(dragState.holdTarget===li){
-            dragState.isHolding=true;
-            clearDragOver();
-            li.classList.add('drag-group-hold');
-          }
-        },1000);
-      }
-      if(!dragState.isHolding){
-        clearDragOver();
-        li.classList.add(isTop?'drag-before':'drag-after');
-      }
-    } else {
-      // 1秒以上同じアイテム上 → グループ化モード
-      dragState.isHolding=true;
-      clearDragOver();
+    if(!isSameTarget){
+      // 違うアイテムに移動：ホールドリセット・タイマー再設定
+      dragState.holdTarget=li;
+      dragState.isHolding=false;
+      if(dragState.holdTimer){ clearTimeout(dragState.holdTimer); dragState.holdTimer=null; }
+      dragState.holdTimer=setTimeout(()=>{
+        if(dragState.holdTarget===li){
+          dragState.isHolding=true;
+          clearDragOver();
+          li.classList.add('drag-group-hold');
+        }
+      },1000);
+    }
+
+    // isHolding中は常にグループ化ハイライト、それ以外は挿入ライン
+    clearDragOver();
+    if(dragState.isHolding){
       li.classList.add('drag-group-hold');
+    } else {
+      li.classList.add(isTop?'drag-before':'drag-after');
     }
   });
   li.addEventListener('dragleave',e=>{
@@ -1128,11 +1127,15 @@ function renderGroupItem(group,idx){
       e.stopPropagation();
       stopSeById(c.id);
       group.children.splice(group.children.indexOf(c),1);
-      if(group.children.length===0){
-        seList.splice(idx,1);
+      await dbDel('audio_files',c.id);
+      // 0または1つになったらグループ解除
+      if(group.children.length<=1){
+        const remaining=group.children.splice(0);
+        seList.splice(idx,1,...remaining);
+        if(cursor>=seList.length) cursor=Math.max(0,seList.length-1);
+      } else {
         if(cursor>=seList.length) cursor=Math.max(0,seList.length-1);
       }
-      await dbDel('audio_files',c.id);
       await saveAll();
       renderList(); updateFabIcon();
     });
@@ -1163,8 +1166,15 @@ function renderGroupItem(group,idx){
       try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
       if(dragData.type==='child') return;
       e.stopPropagation();
+      const rect=childEl.getBoundingClientRect();
+      const isTop=(e.clientY-rect.top)<rect.height/2;
       clearDragState(); clearDragOver();
-      handleDrop(e,{type:'group',idx});
+      // 子音源エリアへのSEドロップ：insert-before/after でグループ外に配置
+      if(dragData.type==='se'){
+        handleDrop(e,{type:'se',idx,dropMode:isTop?'insert-before':'insert-after'});
+      } else {
+        handleDrop(e,{type:'group',idx});
+      }
     });
 
     childrenEl.appendChild(childEl);
@@ -1265,8 +1275,9 @@ function handleDrop(e, target){
   // ── 子音源のドラッグ ──
   if(dragData.type==='child'){
     const {childId, fromGroupIdx}=dragData;
-    const targetType=target.type; // 'se' or 'group'
+    const targetType=target.type;
     const targetIdx=target.idx;
+    const dropMode=target.dropMode||'insert-before';
 
     const fromGroup=seList[fromGroupIdx];
     if(!fromGroup||fromGroup.type!=='group') return;
@@ -1274,21 +1285,33 @@ function handleDrop(e, target){
     if(childIdx===-1) return;
     const child=fromGroup.children[childIdx];
 
-    if(targetType==='group'&&targetIdx===fromGroupIdx){
-      // 同じグループ内 → 何もしない
-      return;
-    }
+    if(targetType==='group'&&targetIdx===fromGroupIdx) return; // 同じグループ内→無視
 
-    // グループ外（別のSEまたは別のグループ）へドロップ → グループから除外してSEとして挿入
+    // グループから子音源を取り出す
     fromGroup.children.splice(childIdx,1);
-    if(fromGroup.children.length===0){
-      // グループが空になったら解除
-      seList.splice(fromGroupIdx,1);
+
+    // グループが0または1になったら解除
+    if(fromGroup.children.length<=1){
+      const remaining=fromGroup.children.splice(0); // 残りを取り出す
+      seList.splice(fromGroupIdx,1);               // グループ削除
+      seList.splice(fromGroupIdx,0,...remaining);   // 残りをグループの位置に展開
     }
 
-    // 挿入位置を決定
+    // グループ削除・展開後のtargetIdxを再計算
+    // seListが変化しているので、targetIdxが参照するアイテムを名前で再検索
+    // → 単純にtargetIdxを使うが、fromGroupIdx削除分の補正だけ行う
+    const groupWasAt=fromGroupIdx;
+    // グループが削除・展開された場合、展開後のサイズ変化を考慮
+    // 元グループ削除→残り0か1が展開された場合の補正
+    // fromGroupIdx < targetIdx なら targetIdx はずれる
     let insertAt=targetIdx;
-    if(fromGroupIdx<=targetIdx&&fromGroup.children.length===0) insertAt--; // グループ削除分ずらす
+    const groupRemoved=fromGroup.children.length===0; // 展開後0→グループ自体消えた
+    // 実際にはgroupWasAt位置のアイテムが変わった後なので
+    // targetIdxがgroupWasAtより後ろにあった場合は補正
+    // (元のグループが1アイテム→SEに変わっているのでインデックスは変わらない)
+    // groupWasAtを丸ごと削除→展開なしの場合のみ-1
+    if(groupRemoved&&groupWasAt<targetIdx) insertAt--;
+    if(dropMode==='insert-after') insertAt++;
     insertAt=Math.max(0,Math.min(seList.length,insertAt));
     seList.splice(insertAt,0,child);
     cursor=insertAt;
@@ -1713,14 +1736,17 @@ $settOv.addEventListener('click',e=>{if(e.target===$settOv)closeSett();});
 document.getElementById('btn-remove-se').addEventListener('click',async()=>{
   if(!editingSeId) return;
   stopSeById(editingSeId);
-  // Remove from seList or group
   for(let i=0;i<seList.length;i++){
     if(seList[i].type==='se'&&seList[i].id===editingSeId){seList.splice(i,1);break;}
     if(seList[i].type==='group'){
       const j=seList[i].children.findIndex(c=>c.id===editingSeId);
       if(j!==-1){
         seList[i].children.splice(j,1);
-        if(seList[i].children.length===0) seList.splice(i,1); // remove empty group
+        // 0または1つになったらグループ解除
+        if(seList[i].children.length<=1){
+          const remaining=seList[i].children.splice(0);
+          seList.splice(i,1,...remaining);
+        }
         break;
       }
     }
