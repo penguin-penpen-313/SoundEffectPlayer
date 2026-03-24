@@ -368,7 +368,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.9</span>
+      <span class="logo-ver">v0.6.10</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -567,7 +567,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.9
+// PenguinSoundEffectPlayer  v0.6.10
 // =============================================
 
 // ===== IndexedDB =====
@@ -1001,9 +1001,9 @@ function renderSeItem(se,idx){
     e.preventDefault();
     const rect=li.getBoundingClientRect();
     const isTop=(e.clientY-rect.top)<rect.height/2;
-    const doGroup = dragState.isHolding && dragState.dragType!=='group';
+    const wasHolding = dragState.isHolding && dragState.dragType!=='group'; // 先に保存
     clearDragState(); clearDragOver();
-    handleDrop(e,{type:'se',idx,dropMode:doGroup?'group':(isTop?'insert-before':'insert-after')});
+    handleDrop(e,{type:'se',idx,dropMode:wasHolding?'group':(isTop?'insert-before':'insert-after')});
   });
 
   return li;
@@ -1141,9 +1141,9 @@ function renderGroupItem(group,idx){
       e.stopPropagation();
       const rect=el.getBoundingClientRect();
       const isTop=(e.clientY-rect.top)<rect.height/2;
-      const doGroupAdd = dragState.isHolding && dragState.dragType!=='group';
+      const wasHolding = dragState.isHolding && dragState.dragType!=='group'; // 先に保存
       clearDragState(); clearDragOver();
-      if(doGroupAdd){
+      if(wasHolding){
         handleDrop(e,{type:'group-add',idx,groupId:group.id,dropMode:isTop?'insert-before':'insert-after'});
       } else {
         handleDrop(e,{type:'group',idx,dropMode:isTop?'insert-before':'insert-after'});
@@ -1208,9 +1208,9 @@ function renderGroupItem(group,idx){
     e.preventDefault();
     const rect=el.getBoundingClientRect();
     const isTop=(e.clientY-rect.top)<rect.height/2;
-    const doGroupAdd = dragState.isHolding && dragState.dragType!=='group';
+    const wasHolding = dragState.isHolding && dragState.dragType!=='group'; // 先に保存
     clearDragState(); clearDragOver();
-    if(doGroupAdd){
+    if(wasHolding){
       handleDrop(e,{type:'group-add',idx,groupId:group.id,dropMode:isTop?'insert-before':'insert-after'});
     } else {
       handleDrop(e,{type:'group',idx,dropMode:isTop?'insert-before':'insert-after'});
@@ -1255,22 +1255,19 @@ function clearDragState(){
   dragState.dragType='';
 }
 
-// ホールド判定ロジック（SE/childドラッグ時のみ。groupドラッグ時はハイライトしない）
-// targetEl: ホバー中の要素、groupMode: trueならグループ化ハイライト
-// 戻り値: 現在グループ化モードかどうか
+// ホールド判定ロジック
 function applyHoldLogic(targetEl, e, allowGroup){
   if(!allowGroup){
-    // グループドラッグ中は常に順番変更ハイライトのみ
     clearDragOver();
     const rect=targetEl.getBoundingClientRect();
     targetEl.classList.add((e.clientY-rect.top)<rect.height/2?'drag-before':'drag-after');
-    return false;
+    return;
   }
 
-  const isSameTarget=dragState.holdTarget===targetEl;
+  const isSameTarget = dragState.holdTarget===targetEl;
+
   if(!isSameTarget){
-    // 別のターゲットに移動 → ホールドリセット
-    clearDragOver();
+    // 別ターゲットに移動 → ホールドリセット＆タイマー再起動
     if(dragState.holdTimer){clearTimeout(dragState.holdTimer);dragState.holdTimer=null;}
     dragState.holdTarget=targetEl;
     dragState.isHolding=false;
@@ -1283,15 +1280,17 @@ function applyHoldLogic(targetEl, e, allowGroup){
     },1000);
   }
 
+  // isHolding中はdrag-group-holdを維持（clearDragOverを呼ばない）
   if(dragState.isHolding){
-    clearDragOver();
-    targetEl.classList.add('drag-group-hold');
-    return true;
+    if(!targetEl.classList.contains('drag-group-hold')){
+      clearDragOver();
+      targetEl.classList.add('drag-group-hold');
+    }
   } else {
+    // タイマー待ち中：drag-before/after表示（holdTimerは止めない）
     clearDragOver();
     const rect=targetEl.getBoundingClientRect();
     targetEl.classList.add((e.clientY-rect.top)<rect.height/2?'drag-before':'drag-after');
-    return false;
   }
 }
 
@@ -1343,60 +1342,65 @@ function handleDrop(e, target){
     if(childIdx===-1) return;
     const child=fromGroup.children[childIdx];
 
-    // 別グループに追加（1秒ホールド後）
+    // -- 別グループに追加（1秒ホールド後）--
     if(tType==='group-add'){
       fromGroup.children.splice(childIdx,1);
       collapseIfSmall(fromGroupIdx);
-      // collapseIfSmallがseListを変更している可能性があるので再取得
-      const targetGroup=seList.find((item,i)=>{
-        // fromGroupが削除されていればtIdxは1つずれている可能性
-        return item.type==='group'&&item.id===target.groupId;
-      });
+      const targetGroup=seList.find(item=>item.type==='group'&&item.id===target.groupId);
       if(targetGroup) addToGroup(targetGroup,child);
       else seList.splice(Math.min(tIdx,seList.length),0,child);
       saveAll(); renderList(); return;
     }
 
-    // SEへのドロップ or グループへの順番変更ドロップ
-    // → グループから出してリストに挿入
-    fromGroup.children.splice(childIdx,1);
-    const groupWillCollapse = fromGroup.children.length<=1;
-    const remaining = groupWillCollapse ? [...fromGroup.children] : null;
-    if(groupWillCollapse){
-      fromGroup.children.length=0;
-      seList.splice(fromGroupIdx,1,...(remaining||[]));
-    }
+    // -- SEアイテムへのドロップ --
+    if(tType==='se'){
+      // ドロップ先SEへの参照を保存（seList操作前に取得）
+      const targetSe=seList[tIdx];
 
-    // fromGroupIdx削除/縮小によるtIdxの補正
-    // グループが消えた: -1、残り1つに縮小(置換): 0
-    const shift = groupWillCollapse ? (remaining.length - 1) : 0;
-    let insertAt = fromGroupIdx < tIdx ? tIdx + shift : tIdx;
-    if(dropMode==='insert-after') insertAt++;
-    // child→SEグループ化（1秒ホールド）
-    if(tType==='se' && dragState.isHolding){
-      // 挿入後にSEとグループ化
+      // グループ化（1秒ホールド後）
+      if(dropMode==='group'){
+        fromGroup.children.splice(childIdx,1);
+        collapseIfSmall(fromGroupIdx);
+        const actualIdx=seList.indexOf(targetSe);
+        if(actualIdx===-1){ saveAll(); renderList(); return; }
+        if(seList[actualIdx].type==='se'){
+          const g=makeGroup(seList[actualIdx],child);
+          seList.splice(actualIdx,1,g);
+          cursor=actualIdx;
+        } else if(seList[actualIdx].type==='group'){
+          addToGroup(seList[actualIdx],child);
+          cursor=actualIdx;
+        }
+        saveAll(); renderList(); return;
+      }
+
+      // 順番変更（短ドロップ）
+      fromGroup.children.splice(childIdx,1);
+      collapseIfSmall(fromGroupIdx);
+      const actualIdx=seList.indexOf(targetSe);
+      let insertAt = actualIdx===-1 ? seList.length : actualIdx;
+      if(dropMode==='insert-after') insertAt++;
       insertAt=Math.max(0,Math.min(seList.length,insertAt));
       seList.splice(insertAt,0,child);
-      // 挿入したchildとtIdxのSEをグループ化
-      const seIdx=seList.findIndex((s,i)=>i!==insertAt&&seList[i]===seList[tIdx+(fromGroupIdx<=tIdx?shift:0)]);
-      // シンプルに: 挿入位置とその隣をグループ化
-      const neighborIdx = insertAt<=tIdx+shift ? insertAt+1 : insertAt-1;
-      if(neighborIdx>=0&&neighborIdx<seList.length&&seList[neighborIdx].type==='se'){
-        const seA=seList[insertAt], seB=seList[neighborIdx];
-        const lo=Math.min(insertAt,neighborIdx), hi=Math.max(insertAt,neighborIdx);
-        const g=makeGroup(seA,seB);
-        seList.splice(hi,1); seList.splice(lo,1); seList.splice(lo,0,g);
-        cursor=lo;
-      } else { cursor=insertAt; }
+      cursor=insertAt;
       saveAll(); renderList(); return;
     }
-    insertAt=Math.max(0,Math.min(seList.length,insertAt));
-    seList.splice(insertAt,0,child);
-    cursor=insertAt;
-    saveAll(); renderList(); return;
-  }
 
-  // ========= SEドラッグ =========
+    // -- グループへの順番変更ドロップ（group-reorder相当）--
+    if(tType==='group'){
+      const targetGroupEl=seList[tIdx];
+      fromGroup.children.splice(childIdx,1);
+      collapseIfSmall(fromGroupIdx);
+      const actualIdx=seList.indexOf(targetGroupEl);
+      let insertAt = actualIdx===-1 ? seList.length : actualIdx;
+      if(dropMode==='insert-after') insertAt++;
+      insertAt=Math.max(0,Math.min(seList.length,insertAt));
+      seList.splice(insertAt,0,child);
+      cursor=insertAt;
+      saveAll(); renderList(); return;
+    }
+    return;
+  }
   if(dragData.type==='se'){
     const fromIdx=dragData.idx;
     const fromItem=seList[fromIdx];
