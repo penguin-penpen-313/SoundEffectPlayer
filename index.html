@@ -204,7 +204,7 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
 .group-drag-handle{width:4px;height:20px;background:var(--group-border);border-radius:2px;
   cursor:grab;flex-shrink:0}
 .group-item:hover .group-drag-handle{background:var(--group-accent)}
-.group-icon{font-size:11px;color:var(--accent4);flex-shrink:0}
+.group-num{font-family:var(--mono);font-size:10px;color:var(--text-dim);flex-shrink:0;min-width:22px;text-align:center}
 .group-label{font-family:var(--mono);font-size:10px;color:var(--accent4);letter-spacing:1px;flex:1}
 .group-count{font-family:var(--mono);font-size:9px;color:var(--text-dim)}
 .btn-play-group{background:none;border:1px solid var(--group-border);border-radius:4px;
@@ -368,7 +368,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.7</span>
+      <span class="logo-ver">v0.6.8</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -567,7 +567,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.7
+// PenguinSoundEffectPlayer  v0.6.8
 // =============================================
 
 // ===== IndexedDB =====
@@ -960,6 +960,7 @@ function renderSeItem(se,idx){
     seList.splice(idx,1);
     if(cursor>=seList.length) cursor=Math.max(0,seList.length-1);
     await dbDel('audio_files',se.id);
+    collapseSmallGroups();
     await saveAll();
     renderList(); updateFabIcon();
   });
@@ -973,6 +974,7 @@ function renderSeItem(se,idx){
     dragState.holdTarget=null;
     dragState.holdTimer=null;
     dragState.isHolding=false;
+    dragState.dragType='se';
   });
   li.addEventListener('dragend',()=>{
     li.classList.remove('dragging');
@@ -981,46 +983,17 @@ function renderSeItem(se,idx){
   });
   li.addEventListener('dragover',e=>{
     e.preventDefault();
-    let dragData;
-    try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')||'{}'); }catch{ dragData={}; }
-    const rect=li.getBoundingClientRect();
-    const isTop=(e.clientY-rect.top)<rect.height/2;
-
-    // 子音源・グループドラッグはグループエリアのdragoverに任せる
-    if(dragData.type==='child'||dragData.type==='group') return;
-
-    const elapsed=Date.now()-dragState.startTime;
-    const isSameTarget=dragState.holdTarget===li;
-
-    if(!isSameTarget){
-      // 違うアイテムに移動：ホールドリセット・タイマー再設定
-      dragState.holdTarget=li;
-      dragState.isHolding=false;
-      if(dragState.holdTimer){ clearTimeout(dragState.holdTimer); dragState.holdTimer=null; }
-      dragState.holdTimer=setTimeout(()=>{
-        if(dragState.holdTarget===li){
-          dragState.isHolding=true;
-          clearDragOver();
-          li.classList.add('drag-group-hold');
-        }
-      },1000);
-    }
-
-    // isHolding中は常にグループ化ハイライト、それ以外は挿入ライン
-    clearDragOver();
-    if(dragState.isHolding){
-      li.classList.add('drag-group-hold');
-    } else {
-      li.classList.add(isTop?'drag-before':'drag-after');
-    }
+    // groupドラッグ中はホールドによるグループ化を禁止
+    const allowGroup = dragState.dragType !== 'group';
+    applyHoldLogic(li, e, allowGroup);
   });
   li.addEventListener('dragleave',e=>{
     if(!li.contains(e.relatedTarget)){
       li.classList.remove('drag-before','drag-after','drag-group-hold');
-      dragState.isHolding=false;
       if(dragState.holdTarget===li){
+        if(dragState.holdTimer){clearTimeout(dragState.holdTimer);dragState.holdTimer=null;}
         dragState.holdTarget=null;
-        if(dragState.holdTimer){ clearTimeout(dragState.holdTimer); dragState.holdTimer=null; }
+        dragState.isHolding=false;
       }
     }
   });
@@ -1028,7 +1001,8 @@ function renderSeItem(se,idx){
     e.preventDefault();
     const rect=li.getBoundingClientRect();
     const isTop=(e.clientY-rect.top)<rect.height/2;
-    const doGroup=dragState.isHolding;
+    // groupドラッグ中はグループ化しない
+    const doGroup = dragState.isHolding && dragState.dragType!=='group';
     clearDragState(); clearDragOver();
     handleDrop(e,{type:'se',idx,dropMode:doGroup?'group':(isTop?'insert-before':'insert-after')});
   });
@@ -1050,6 +1024,7 @@ function renderGroupItem(group,idx){
   el.innerHTML=`
     <div class="group-header" draggable="true">
       <div class="group-drag-handle"></div>
+      <span class="group-num">${String(idx+1).padStart(2,'0')}</span>
       <span class="group-icon">⬡</span>
       <span class="group-label">GROUP</span>
       <span class="group-count">${group.children.length} tracks</span>
@@ -1148,32 +1123,30 @@ function renderGroupItem(group,idx){
       dragState.startTime=Date.now();
       dragState.holdTarget=null;
       dragState.isHolding=false;
+      dragState.dragType='child';
     });
     childEl.addEventListener('dragend',()=>{childEl.classList.remove('dragging');clearDragState();clearDragOver();});
-    // 子音源エリアのdragover：子音源ドラッグ中は無視、SEドラッグ中はグループに伝播させる
+    // 子音源エリアのdragover
     childEl.addEventListener('dragover',e=>{
-      let dragType='';
-      try{ dragType=JSON.parse(e.dataTransfer.types.includes('text/plain')?'{}':'{}').type||''; }catch{}
-      // 常にpreventDefaultしてdropを受け付け可能にする
       e.preventDefault();
-      // グループ全体にdrag-overを付けてハイライト（伝播はさせない）
-      clearDragOver();
-      el.classList.add('drag-over');
+      // 親グループ要素にホールド判定を適用
+      const allowGroup = dragState.dragType !== 'group';
+      applyHoldLogic(el, e, allowGroup); // el = 親グループ
     });
     childEl.addEventListener('drop',e=>{
       e.preventDefault();
       let dragData;
       try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
-      if(dragData.type==='child') return;
+      if(dragData.type==='child'&&dragData.fromGroupIdx===idx) return; // 同グループ内は無視
       e.stopPropagation();
-      const rect=childEl.getBoundingClientRect();
+      const rect=el.getBoundingClientRect();
       const isTop=(e.clientY-rect.top)<rect.height/2;
+      const doGroup = dragState.isHolding && dragState.dragType!=='group';
       clearDragState(); clearDragOver();
-      // 子音源エリアへのSEドロップ：insert-before/after でグループ外に配置
-      if(dragData.type==='se'){
-        handleDrop(e,{type:'se',idx,dropMode:isTop?'insert-before':'insert-after'});
-      } else {
+      if(doGroup){
         handleDrop(e,{type:'group',idx});
+      } else {
+        handleDrop(e,{type:'group-reorder',idx,dropMode:isTop?'insert-before':'insert-after'});
       }
     });
 
@@ -1193,6 +1166,7 @@ function renderGroupItem(group,idx){
     dragState.startTime=Date.now();
     dragState.holdTarget=null;
     dragState.isHolding=false;
+    dragState.dragType='group';
   });
   el.querySelector('.group-header').addEventListener('dragend',()=>{
     el.classList.remove('dragging'); clearDragState(); clearDragOver();
@@ -1209,18 +1183,37 @@ function renderGroupItem(group,idx){
     ungroupAt(idx);
   });
 
-  // グループ本体：dragover/drop（SEやGroupからのドロップを受け付ける）
+  // グループ本体：dragover/drop
   el.addEventListener('dragover',e=>{
     e.preventDefault();
-    clearDragOver();
-    el.classList.add('drag-group-target');
+    // groupドラッグ中はグループ化ハイライト禁止（順番変更のみ）
+    const allowGroup = dragState.dragType !== 'group';
+    applyHoldLogic(el, e, allowGroup);
   });
   el.addEventListener('dragleave',e=>{
-    if(!el.contains(e.relatedTarget)) el.classList.remove('drag-group-target','drag-over');
+    if(!el.contains(e.relatedTarget)){
+      el.classList.remove('drag-before','drag-after','drag-group-hold','drag-group-target','drag-over');
+      if(dragState.holdTarget===el){
+        if(dragState.holdTimer){clearTimeout(dragState.holdTimer);dragState.holdTimer=null;}
+        dragState.holdTarget=null;
+        dragState.isHolding=false;
+      }
+    }
   });
   el.addEventListener('drop',e=>{
+    e.preventDefault();
+    const rect=el.getBoundingClientRect();
+    const isTop=(e.clientY-rect.top)<rect.height/2;
+    // groupドラッグ中はグループ化しない → 順番変更
+    const doGroup = dragState.isHolding && dragState.dragType!=='group';
     clearDragState(); clearDragOver();
-    handleDrop(e,{type:'group',idx});
+    if(doGroup){
+      // SE/childを1秒ホールド → グループに追加
+      handleDrop(e,{type:'group',idx});
+    } else {
+      // 順番変更（グループとしてではなく位置変更）
+      handleDrop(e,{type:'group-reorder',idx,dropMode:isTop?'insert-before':'insert-after'});
+    }
   });
 
   return el;
@@ -1253,11 +1246,52 @@ function wfSvg(data){
 }
 
 // ===== Drag State =====
-const dragState={startTime:0,holdTarget:null,holdTimer:null,isHolding:false};
+const dragState={startTime:0,holdTarget:null,holdTimer:null,isHolding:false,dragType:''};
 function clearDragState(){
   if(dragState.holdTimer){clearTimeout(dragState.holdTimer);dragState.holdTimer=null;}
   dragState.holdTarget=null;
   dragState.isHolding=false;
+  dragState.dragType='';
+}
+
+// ホールド判定ロジック（SE/childドラッグ時のみ。groupドラッグ時はハイライトしない）
+// targetEl: ホバー中の要素、groupMode: trueならグループ化ハイライト
+// 戻り値: 現在グループ化モードかどうか
+function applyHoldLogic(targetEl, e, allowGroup){
+  if(!allowGroup){
+    // グループドラッグ中は常に順番変更ハイライトのみ
+    clearDragOver();
+    const rect=targetEl.getBoundingClientRect();
+    targetEl.classList.add((e.clientY-rect.top)<rect.height/2?'drag-before':'drag-after');
+    return false;
+  }
+
+  const isSameTarget=dragState.holdTarget===targetEl;
+  if(!isSameTarget){
+    // 別のターゲットに移動 → ホールドリセット
+    clearDragOver();
+    if(dragState.holdTimer){clearTimeout(dragState.holdTimer);dragState.holdTimer=null;}
+    dragState.holdTarget=targetEl;
+    dragState.isHolding=false;
+    dragState.holdTimer=setTimeout(()=>{
+      if(dragState.holdTarget===targetEl){
+        dragState.isHolding=true;
+        clearDragOver();
+        targetEl.classList.add('drag-group-hold');
+      }
+    },1000);
+  }
+
+  if(dragState.isHolding){
+    clearDragOver();
+    targetEl.classList.add('drag-group-hold');
+    return true;
+  } else {
+    clearDragOver();
+    const rect=targetEl.getBoundingClientRect();
+    targetEl.classList.add((e.clientY-rect.top)<rect.height/2?'drag-before':'drag-after');
+    return false;
+  }
 }
 
 function clearDragOver(){
@@ -1272,12 +1306,46 @@ function handleDrop(e, target){
   let dragData;
   try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
 
-  // ── 子音源のドラッグ ──
+  // ── group-reorder: グループへの順番変更（グループ追加ではない） ──
+  if(dragData.type==='se'||dragData.type==='group'||dragData.type==='child'){
+    if(target.type==='group-reorder'){
+      const toIdx=target.idx;
+      const dropMode=target.dropMode||'insert-before';
+
+      if(dragData.type==='child'){
+        // 子音源をグループから出して順番変更として挿入
+        const {childId,fromGroupIdx}=dragData;
+        const fromGroup=seList[fromGroupIdx];
+        if(!fromGroup||fromGroup.type!=='group') return;
+        const childIdx=fromGroup.children.findIndex(c=>c.id===childId);
+        if(childIdx===-1) return;
+        const child=fromGroup.children.splice(childIdx,1)[0];
+        if(fromGroup.children.length===0) seList.splice(fromGroupIdx,1);
+        let insertAt=toIdx+(dropMode==='insert-after'?1:0);
+        if(fromGroupIdx<toIdx) insertAt=Math.max(0,insertAt-1);
+        insertAt=Math.max(0,Math.min(seList.length,insertAt));
+        seList.splice(insertAt,0,child);
+        cursor=insertAt;
+        saveAll(); renderList(); return;
+      }
+
+      const fromIdx=dragData.idx;
+      if(fromIdx===toIdx) return;
+      const moved=seList.splice(fromIdx,1)[0];
+      let insertAt=toIdx+(dropMode==='insert-after'?1:0);
+      if(fromIdx<toIdx) insertAt=Math.max(0,insertAt-1);
+      insertAt=Math.max(0,Math.min(seList.length,insertAt));
+      seList.splice(insertAt,0,moved);
+      cursor=insertAt;
+      saveAll(); renderList(); return;
+    }
+  }
+
+  // ── 子音源のドラッグ → 別グループへの追加（1秒ホールド後） ──
   if(dragData.type==='child'){
     const {childId, fromGroupIdx}=dragData;
     const targetType=target.type;
     const targetIdx=target.idx;
-    const dropMode=target.dropMode||'insert-before';
 
     const fromGroup=seList[fromGroupIdx];
     if(!fromGroup||fromGroup.type!=='group') return;
@@ -1285,38 +1353,23 @@ function handleDrop(e, target){
     if(childIdx===-1) return;
     const child=fromGroup.children[childIdx];
 
-    if(targetType==='group'&&targetIdx===fromGroupIdx) return; // 同じグループ内→無視
+    // 同じグループ内→無視
+    if(targetType==='group'&&targetIdx===fromGroupIdx) return;
 
-    // グループから子音源を取り出す
-    fromGroup.children.splice(childIdx,1);
-
-    // グループが0または1になったら解除
-    if(fromGroup.children.length<=1){
-      const remaining=fromGroup.children.splice(0); // 残りを取り出す
-      seList.splice(fromGroupIdx,1);               // グループ削除
-      seList.splice(fromGroupIdx,0,...remaining);   // 残りをグループの位置に展開
+    // 別グループへ追加
+    if(targetType==='group'){
+      fromGroup.children.splice(childIdx,1);
+      if(fromGroup.children.length===0) seList.splice(fromGroupIdx,1);
+      const targetGroup=seList[targetIdx>fromGroupIdx?targetIdx-(fromGroup.children.length===0?0:0):targetIdx];
+      if(targetGroup&&targetGroup.type==='group'){
+        addToGroup(targetGroup,child);
+      } else {
+        seList.splice(Math.min(targetIdx,seList.length),0,child);
+        cursor=targetIdx;
+      }
+      saveAll(); renderList(); return;
     }
-
-    // グループ削除・展開後のtargetIdxを再計算
-    // seListが変化しているので、targetIdxが参照するアイテムを名前で再検索
-    // → 単純にtargetIdxを使うが、fromGroupIdx削除分の補正だけ行う
-    const groupWasAt=fromGroupIdx;
-    // グループが削除・展開された場合、展開後のサイズ変化を考慮
-    // 元グループ削除→残り0か1が展開された場合の補正
-    // fromGroupIdx < targetIdx なら targetIdx はずれる
-    let insertAt=targetIdx;
-    const groupRemoved=fromGroup.children.length===0; // 展開後0→グループ自体消えた
-    // 実際にはgroupWasAt位置のアイテムが変わった後なので
-    // targetIdxがgroupWasAtより後ろにあった場合は補正
-    // (元のグループが1アイテム→SEに変わっているのでインデックスは変わらない)
-    // groupWasAtを丸ごと削除→展開なしの場合のみ-1
-    if(groupRemoved&&groupWasAt<targetIdx) insertAt--;
-    if(dropMode==='insert-after') insertAt++;
-    insertAt=Math.max(0,Math.min(seList.length,insertAt));
-    seList.splice(insertAt,0,child);
-    cursor=insertAt;
-    saveAll(); renderList();
-    return;
+    return; // group-reorder は上で処理済み
   }
 
   // ── グループのドラッグ（ヘッダーから）→ 常に順番変更のみ ──
@@ -1388,6 +1441,21 @@ function ungroupAt(idx){
   seList.splice(idx,1,...g.children);
   cursor=idx;
   saveAll(); renderList();
+}
+
+// グループ内が1つ以下になったら自動解除
+function collapseSmallGroups(){
+  let changed=false;
+  for(let i=seList.length-1;i>=0;i--){
+    const item=seList[i];
+    if(item.type==='group'&&item.children.length<=1){
+      const remaining=[...item.children];
+      seList.splice(i,1,...remaining);
+      if(cursor>i+Math.max(0,remaining.length-1)) cursor=Math.max(0,cursor-(1-remaining.length));
+      changed=true;
+    }
+  }
+  return changed;
 }
 
 // ===== Play engine =====
