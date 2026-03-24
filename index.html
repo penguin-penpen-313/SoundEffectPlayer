@@ -368,7 +368,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.8</span>
+      <span class="logo-ver">v0.6.9</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -567,7 +567,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.8
+// PenguinSoundEffectPlayer  v0.6.9
 // =============================================
 
 // ===== IndexedDB =====
@@ -1001,7 +1001,6 @@ function renderSeItem(se,idx){
     e.preventDefault();
     const rect=li.getBoundingClientRect();
     const isTop=(e.clientY-rect.top)<rect.height/2;
-    // groupドラッグ中はグループ化しない
     const doGroup = dragState.isHolding && dragState.dragType!=='group';
     clearDragState(); clearDragOver();
     handleDrop(e,{type:'se',idx,dropMode:doGroup?'group':(isTop?'insert-before':'insert-after')});
@@ -1137,16 +1136,17 @@ function renderGroupItem(group,idx){
       e.preventDefault();
       let dragData;
       try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
-      if(dragData.type==='child'&&dragData.fromGroupIdx===idx) return; // 同グループ内は無視
+      // 同グループ内の子音源ドラッグは常に無視
+      if(dragData.type==='child'&&dragData.fromGroupIdx===idx) return;
       e.stopPropagation();
       const rect=el.getBoundingClientRect();
       const isTop=(e.clientY-rect.top)<rect.height/2;
-      const doGroup = dragState.isHolding && dragState.dragType!=='group';
+      const doGroupAdd = dragState.isHolding && dragState.dragType!=='group';
       clearDragState(); clearDragOver();
-      if(doGroup){
-        handleDrop(e,{type:'group',idx});
+      if(doGroupAdd){
+        handleDrop(e,{type:'group-add',idx,groupId:group.id,dropMode:isTop?'insert-before':'insert-after'});
       } else {
-        handleDrop(e,{type:'group-reorder',idx,dropMode:isTop?'insert-before':'insert-after'});
+        handleDrop(e,{type:'group',idx,dropMode:isTop?'insert-before':'insert-after'});
       }
     });
 
@@ -1186,7 +1186,11 @@ function renderGroupItem(group,idx){
   // グループ本体：dragover/drop
   el.addEventListener('dragover',e=>{
     e.preventDefault();
-    // groupドラッグ中はグループ化ハイライト禁止（順番変更のみ）
+    // childが同グループ内ドラッグの場合は何もしない
+    if(dragState.dragType==='child'){
+      // fromGroupIdxはdragDataから取れないのでdragStateで管理できない
+      // → drop時に同グループ判定するので、ここでは常にapplyHoldLogic
+    }
     const allowGroup = dragState.dragType !== 'group';
     applyHoldLogic(el, e, allowGroup);
   });
@@ -1204,15 +1208,12 @@ function renderGroupItem(group,idx){
     e.preventDefault();
     const rect=el.getBoundingClientRect();
     const isTop=(e.clientY-rect.top)<rect.height/2;
-    // groupドラッグ中はグループ化しない → 順番変更
-    const doGroup = dragState.isHolding && dragState.dragType!=='group';
+    const doGroupAdd = dragState.isHolding && dragState.dragType!=='group';
     clearDragState(); clearDragOver();
-    if(doGroup){
-      // SE/childを1秒ホールド → グループに追加
-      handleDrop(e,{type:'group',idx});
+    if(doGroupAdd){
+      handleDrop(e,{type:'group-add',idx,groupId:group.id,dropMode:isTop?'insert-before':'insert-after'});
     } else {
-      // 順番変更（グループとしてではなく位置変更）
-      handleDrop(e,{type:'group-reorder',idx,dropMode:isTop?'insert-before':'insert-after'});
+      handleDrop(e,{type:'group',idx,dropMode:isTop?'insert-before':'insert-after'});
     }
   });
 
@@ -1300,52 +1301,41 @@ function clearDragOver(){
 }
 
 // ===== Drag & Drop handler =====
+// dropMode: 'insert-before' | 'insert-after' | 'group'
+// target.type: 'se' | 'group' | 'group-add'
+//   se          → SEアイテムへのドロップ
+//   group       → グループアイテムへの順番変更ドロップ
+//   group-add   → グループアイテムへの追加ドロップ（1秒ホールド後）
+
 function handleDrop(e, target){
   e.preventDefault();
   clearDragOver();
   let dragData;
   try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')); }catch{ return; }
 
-  // ── group-reorder: グループへの順番変更（グループ追加ではない） ──
-  if(dragData.type==='se'||dragData.type==='group'||dragData.type==='child'){
-    if(target.type==='group-reorder'){
-      const toIdx=target.idx;
-      const dropMode=target.dropMode||'insert-before';
+  const {type:tType, idx:tIdx, dropMode} = target;
 
-      if(dragData.type==='child'){
-        // 子音源をグループから出して順番変更として挿入
-        const {childId,fromGroupIdx}=dragData;
-        const fromGroup=seList[fromGroupIdx];
-        if(!fromGroup||fromGroup.type!=='group') return;
-        const childIdx=fromGroup.children.findIndex(c=>c.id===childId);
-        if(childIdx===-1) return;
-        const child=fromGroup.children.splice(childIdx,1)[0];
-        if(fromGroup.children.length===0) seList.splice(fromGroupIdx,1);
-        let insertAt=toIdx+(dropMode==='insert-after'?1:0);
-        if(fromGroupIdx<toIdx) insertAt=Math.max(0,insertAt-1);
-        insertAt=Math.max(0,Math.min(seList.length,insertAt));
-        seList.splice(insertAt,0,child);
-        cursor=insertAt;
-        saveAll(); renderList(); return;
-      }
-
-      const fromIdx=dragData.idx;
-      if(fromIdx===toIdx) return;
-      const moved=seList.splice(fromIdx,1)[0];
-      let insertAt=toIdx+(dropMode==='insert-after'?1:0);
-      if(fromIdx<toIdx) insertAt=Math.max(0,insertAt-1);
-      insertAt=Math.max(0,Math.min(seList.length,insertAt));
-      seList.splice(insertAt,0,moved);
-      cursor=insertAt;
-      saveAll(); renderList(); return;
-    }
+  // ========= グループドラッグ → 常に順番変更 =========
+  if(dragData.type==='group'){
+    const fromIdx=dragData.idx;
+    const toIdx=tIdx;
+    if(fromIdx===toIdx) return;
+    const moved=seList.splice(fromIdx,1)[0];
+    // splice後にtoIdxを補正
+    let ins = fromIdx<toIdx ? toIdx-1 : toIdx;
+    if(dropMode==='insert-after') ins = fromIdx<toIdx ? toIdx : toIdx+1;
+    ins=Math.max(0,Math.min(seList.length,ins));
+    seList.splice(ins,0,moved);
+    cursor=ins;
+    saveAll(); renderList(); return;
   }
 
-  // ── 子音源のドラッグ → 別グループへの追加（1秒ホールド後） ──
+  // ========= 子音源ドラッグ =========
   if(dragData.type==='child'){
     const {childId, fromGroupIdx}=dragData;
-    const targetType=target.type;
-    const targetIdx=target.idx;
+
+    // 同グループ内ドロップ → 何もしない
+    if((tType==='group'||tType==='group-add') && tIdx===fromGroupIdx) return;
 
     const fromGroup=seList[fromGroupIdx];
     if(!fromGroup||fromGroup.type!=='group') return;
@@ -1353,85 +1343,132 @@ function handleDrop(e, target){
     if(childIdx===-1) return;
     const child=fromGroup.children[childIdx];
 
-    // 同じグループ内→無視
-    if(targetType==='group'&&targetIdx===fromGroupIdx) return;
-
-    // 別グループへ追加
-    if(targetType==='group'){
+    // 別グループに追加（1秒ホールド後）
+    if(tType==='group-add'){
       fromGroup.children.splice(childIdx,1);
-      if(fromGroup.children.length===0) seList.splice(fromGroupIdx,1);
-      const targetGroup=seList[targetIdx>fromGroupIdx?targetIdx-(fromGroup.children.length===0?0:0):targetIdx];
-      if(targetGroup&&targetGroup.type==='group'){
-        addToGroup(targetGroup,child);
-      } else {
-        seList.splice(Math.min(targetIdx,seList.length),0,child);
-        cursor=targetIdx;
-      }
+      collapseIfSmall(fromGroupIdx);
+      // collapseIfSmallがseListを変更している可能性があるので再取得
+      const targetGroup=seList.find((item,i)=>{
+        // fromGroupが削除されていればtIdxは1つずれている可能性
+        return item.type==='group'&&item.id===target.groupId;
+      });
+      if(targetGroup) addToGroup(targetGroup,child);
+      else seList.splice(Math.min(tIdx,seList.length),0,child);
       saveAll(); renderList(); return;
     }
-    return; // group-reorder は上で処理済み
+
+    // SEへのドロップ or グループへの順番変更ドロップ
+    // → グループから出してリストに挿入
+    fromGroup.children.splice(childIdx,1);
+    const groupWillCollapse = fromGroup.children.length<=1;
+    const remaining = groupWillCollapse ? [...fromGroup.children] : null;
+    if(groupWillCollapse){
+      fromGroup.children.length=0;
+      seList.splice(fromGroupIdx,1,...(remaining||[]));
+    }
+
+    // fromGroupIdx削除/縮小によるtIdxの補正
+    // グループが消えた: -1、残り1つに縮小(置換): 0
+    const shift = groupWillCollapse ? (remaining.length - 1) : 0;
+    let insertAt = fromGroupIdx < tIdx ? tIdx + shift : tIdx;
+    if(dropMode==='insert-after') insertAt++;
+    // child→SEグループ化（1秒ホールド）
+    if(tType==='se' && dragState.isHolding){
+      // 挿入後にSEとグループ化
+      insertAt=Math.max(0,Math.min(seList.length,insertAt));
+      seList.splice(insertAt,0,child);
+      // 挿入したchildとtIdxのSEをグループ化
+      const seIdx=seList.findIndex((s,i)=>i!==insertAt&&seList[i]===seList[tIdx+(fromGroupIdx<=tIdx?shift:0)]);
+      // シンプルに: 挿入位置とその隣をグループ化
+      const neighborIdx = insertAt<=tIdx+shift ? insertAt+1 : insertAt-1;
+      if(neighborIdx>=0&&neighborIdx<seList.length&&seList[neighborIdx].type==='se'){
+        const seA=seList[insertAt], seB=seList[neighborIdx];
+        const lo=Math.min(insertAt,neighborIdx), hi=Math.max(insertAt,neighborIdx);
+        const g=makeGroup(seA,seB);
+        seList.splice(hi,1); seList.splice(lo,1); seList.splice(lo,0,g);
+        cursor=lo;
+      } else { cursor=insertAt; }
+      saveAll(); renderList(); return;
+    }
+    insertAt=Math.max(0,Math.min(seList.length,insertAt));
+    seList.splice(insertAt,0,child);
+    cursor=insertAt;
+    saveAll(); renderList(); return;
   }
 
-  // ── グループのドラッグ（ヘッダーから）→ 常に順番変更のみ ──
-  if(dragData.type==='group'){
-    const fromIdx=dragData.idx;
-    const toIdx=target.idx;
-    if(fromIdx===toIdx) return;
-    const moved=seList.splice(fromIdx,1)[0];
-    const ins=fromIdx<toIdx?toIdx-1:toIdx;
-    seList.splice(ins,0,moved);
-    cursor=ins;
-    saveAll(); renderList();
-    return;
-  }
-
-  // ── SE のドラッグ ──
+  // ========= SEドラッグ =========
   if(dragData.type==='se'){
     const fromIdx=dragData.idx;
-    const toIdx=target.idx;
-    const dropMode=target.dropMode||'group'; // 'insert' or 'group'
-    if(fromIdx===toIdx) return;
     const fromItem=seList[fromIdx];
-    const toItem  =seList[toIdx];
-    if(!fromItem||!toItem) return;
+    if(!fromItem) return;
 
-    // SE → SE + insert-before: toIdxの前に挿入
-    if(fromItem.type==='se'&&toItem.type==='se'&&(dropMode==='insert-before'||dropMode==='insert-after')){
+    // グループに追加（1秒ホールド後）
+    if(tType==='group-add'){
+      const toGroup=seList[tIdx];
+      if(!toGroup||toGroup.type!=='group') return;
+      addToGroup(toGroup,fromItem);
+      seList.splice(fromIdx,1);
+      cursor=tIdx>fromIdx?tIdx-1:tIdx;
+      saveAll(); renderList(); return;
+    }
+
+    // SE→SE
+    if(tType==='se'){
+      const toIdx=tIdx;
+      if(fromIdx===toIdx) return;
+      const toItem=seList[toIdx];
+      if(!toItem) return;
+
+      // グループ化（1秒ホールド後）
+      if(dropMode==='group'){
+        if(toItem.type==='se'){
+          const g=makeGroup(toItem,fromItem);
+          const hi=Math.max(fromIdx,toIdx), lo=Math.min(fromIdx,toIdx);
+          seList.splice(hi,1); seList.splice(lo,1); seList.splice(lo,0,g);
+          cursor=lo;
+          saveAll(); renderList(); return;
+        }
+        if(toItem.type==='group'){
+          addToGroup(toItem,fromItem);
+          seList.splice(fromIdx,1);
+          cursor=toIdx>fromIdx?toIdx-1:toIdx;
+          saveAll(); renderList(); return;
+        }
+      }
+
+      // 順番変更（insert-before / insert-after）
       const moved=seList.splice(fromIdx,1)[0];
-      let insertAt=fromIdx<toIdx?toIdx-1:toIdx;
-      if(dropMode==='insert-after') insertAt=fromIdx<toIdx?toIdx-1+1:toIdx+1;
+      let insertAt = fromIdx<toIdx ? toIdx-1 : toIdx;
+      if(dropMode==='insert-after') insertAt = fromIdx<toIdx ? toIdx : toIdx+1;
       insertAt=Math.max(0,Math.min(seList.length,insertAt));
       seList.splice(insertAt,0,moved);
       cursor=insertAt;
-      saveAll(); renderList();
-      return;
+      saveAll(); renderList(); return;
     }
-    // SE → SE + group モード: グループ化
-    if(fromItem.type==='se'&&toItem.type==='se'){
-      const g=makeGroup(toItem,fromItem);
-      const hi=Math.max(fromIdx,toIdx);
-      const lo=Math.min(fromIdx,toIdx);
-      seList.splice(hi,1);
-      seList.splice(lo,1);
-      seList.splice(lo,0,g);
-      cursor=lo;
-      saveAll(); renderList();
-      return;
+
+    // SE→グループ 順番変更
+    if(tType==='group'){
+      const toIdx=tIdx;
+      if(fromIdx===toIdx) return;
+      const moved=seList.splice(fromIdx,1)[0];
+      let insertAt = fromIdx<toIdx ? toIdx-1 : toIdx;
+      if(dropMode==='insert-after') insertAt = fromIdx<toIdx ? toIdx : toIdx+1;
+      insertAt=Math.max(0,Math.min(seList.length,insertAt));
+      seList.splice(insertAt,0,moved);
+      cursor=insertAt;
+      saveAll(); renderList(); return;
     }
-    // SE → Group: グループに追加
-    if(fromItem.type==='se'&&toItem.type==='group'){
-      addToGroup(toItem,fromItem);
-      seList.splice(fromIdx,1);
-      cursor=toIdx>fromIdx?toIdx-1:toIdx;
-      saveAll(); renderList();
-      return;
-    }
-    // SE → その他: 順番変更
-    const moved=seList.splice(fromIdx,1)[0];
-    const ins=fromIdx<toIdx?toIdx-1:toIdx;
-    seList.splice(ins,0,moved);
-    cursor=ins;
-    saveAll(); renderList();
+  }
+}
+
+// グループが1つ以下になったら解除
+function collapseIfSmall(groupIdx){
+  const g=seList[groupIdx];
+  if(!g||g.type!=='group') return;
+  if(g.children.length<=1){
+    const remaining=[...g.children];
+    seList.splice(groupIdx,1,...remaining);
+    if(cursor>=seList.length) cursor=Math.max(0,seList.length-1);
   }
 }
 
@@ -1441,21 +1478,6 @@ function ungroupAt(idx){
   seList.splice(idx,1,...g.children);
   cursor=idx;
   saveAll(); renderList();
-}
-
-// グループ内が1つ以下になったら自動解除
-function collapseSmallGroups(){
-  let changed=false;
-  for(let i=seList.length-1;i>=0;i--){
-    const item=seList[i];
-    if(item.type==='group'&&item.children.length<=1){
-      const remaining=[...item.children];
-      seList.splice(i,1,...remaining);
-      if(cursor>i+Math.max(0,remaining.length-1)) cursor=Math.max(0,cursor-(1-remaining.length));
-      changed=true;
-    }
-  }
-  return changed;
 }
 
 // ===== Play engine =====
