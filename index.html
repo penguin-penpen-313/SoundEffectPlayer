@@ -116,7 +116,20 @@ main{display:flex;flex:1;overflow:hidden;position:relative}
   animation:activePulse 2s ease-in-out infinite;
 }
 .se-item.dragging{opacity:.3;border-style:dashed}
-.se-item.drag-over{outline:2px solid var(--accent2);outline-offset:-2px}
+/* ドロップ位置インジケーター：上半分=挿入(順番変更)、下半分=グループ化 */
+.se-item.drag-insert-before{
+  border-top:2px solid var(--accent3) !important;
+  box-shadow:0 -2px 8px rgba(202,240,248,.4);
+}
+.se-item.drag-insert-after{
+  border-bottom:2px solid var(--accent3) !important;
+  box-shadow:0 2px 8px rgba(202,240,248,.4);
+}
+.se-item.drag-group-target{
+  outline:2px solid var(--accent2);
+  outline-offset:-2px;
+  background:rgba(0,180,216,.12) !important;
+}
 
 /* se-item inner layout — ボタン大型化のため列幅拡大 */
 .se-row{display:grid;grid-template-columns:24px 1fr 44px 32px 30px 28px;
@@ -959,30 +972,43 @@ function renderSeItem(se,idx){
     renderList(); updateFabIcon();
   });
 
-  li.draggable=false; // drag-handleからのみドラッグ開始
+  li.draggable=true;
 
-  // Drag: drag-handleを押したときだけdraggableをonにする
-  const handle=li.querySelector('.drag-handle');
-  handle.addEventListener('mousedown',()=>{ li.draggable=true; });
-  handle.addEventListener('touchstart',()=>{ li.draggable=true; },{passive:true});
-  li.addEventListener('dragend',()=>{
-    li.draggable=false;
-    li.classList.remove('dragging');
-    clearDragOver();
-  });
+  // Drag
   li.addEventListener('dragstart',e=>{
-    if(!li.draggable) { e.preventDefault(); return; }
     e.dataTransfer.setData('text/plain',JSON.stringify({type:'se',idx}));
     li.classList.add('dragging');
   });
-  document.addEventListener('mouseup',()=>{ li.draggable=false; },{once:false});
+  li.addEventListener('dragend',()=>{
+    li.classList.remove('dragging');
+    clearDragOver();
+  });
   li.addEventListener('dragover',e=>{
     e.preventDefault();
     clearDragOver();
-    li.classList.add('drag-over');
+    let dragData;
+    try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')||'{}'); }catch{ dragData={}; }
+    // 子音源ドラッグ・グループドラッグはグループ用ハイライトのみ
+    if(dragData.type==='child'||dragData.type==='group'){
+      li.classList.add('drag-group-target'); return;
+    }
+    // SE→SE: 上半分=挿入(順番変更) / 下半分=グループ化
+    const rect=li.getBoundingClientRect();
+    const isTop=(e.clientY-rect.top)<rect.height/2;
+    if(isTop) li.classList.add('drag-insert-before');
+    else      li.classList.add('drag-group-target');
   });
-  li.addEventListener('dragleave',()=>li.classList.remove('drag-over'));
-  li.addEventListener('drop',e=>handleDrop(e,{type:'se',idx}));
+  li.addEventListener('dragleave',()=>li.classList.remove('drag-over','drag-insert-before','drag-insert-after','drag-group-target'));
+  li.addEventListener('drop',e=>{
+    e.preventDefault();
+    let dragData;
+    try{ dragData=JSON.parse(e.dataTransfer.getData('text/plain')||'{}'); }catch{ dragData={}; }
+    const rect=li.getBoundingClientRect();
+    const isTop=(e.clientY-rect.top)<rect.height/2;
+    // dropMode: 'insert'=順番変更, 'group'=グループ化
+    const dropMode=(dragData.type==='se'&&isTop)?'insert':'group';
+    handleDrop(e,{type:'se',idx,dropMode});
+  });
 
   return li;
 }
@@ -1186,7 +1212,8 @@ function wfSvg(data){
 }
 
 function clearDragOver(){
-  document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+  document.querySelectorAll('.drag-over,.drag-insert-before,.drag-insert-after,.drag-group-target')
+    .forEach(el=>el.classList.remove('drag-over','drag-insert-before','drag-insert-after','drag-group-target'));
 }
 
 // ===== Drag & Drop handler =====
@@ -1247,12 +1274,23 @@ function handleDrop(e, target){
   if(dragData.type==='se'){
     const fromIdx=dragData.idx;
     const toIdx=target.idx;
+    const dropMode=target.dropMode||'group'; // 'insert' or 'group'
     if(fromIdx===toIdx) return;
     const fromItem=seList[fromIdx];
     const toItem  =seList[toIdx];
     if(!fromItem||!toItem) return;
 
-    // SE → SE: グループ化
+    // SE → SE + insert モード: 順番変更（toIdxの前に挿入）
+    if(fromItem.type==='se'&&toItem.type==='se'&&dropMode==='insert'){
+      const moved=seList.splice(fromIdx,1)[0];
+      // fromIdx削除後のtoIdxを補正して挿入
+      const adjustedTo=fromIdx<toIdx?toIdx-1:toIdx;
+      seList.splice(adjustedTo,0,moved);
+      cursor=adjustedTo;
+      saveAll(); renderList();
+      return;
+    }
+    // SE → SE + group モード: グループ化
     if(fromItem.type==='se'&&toItem.type==='se'){
       const g=makeGroup(toItem,fromItem);
       const hi=Math.max(fromIdx,toIdx);
