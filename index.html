@@ -368,7 +368,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.11</span>
+      <span class="logo-ver">v0.6.12</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -567,7 +567,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.11
+// PenguinSoundEffectPlayer  v0.6.12
 // =============================================
 
 // ===== IndexedDB =====
@@ -1254,6 +1254,7 @@ function clearDragState(){
 // ホールド判定ロジック
 function applyHoldLogic(targetEl, e, allowGroup){
   if(!allowGroup){
+    // グループドラッグ中は常に順番変更ハイライトのみ
     clearDragOver();
     const rect=targetEl.getBoundingClientRect();
     targetEl.classList.add((e.clientY-rect.top)<rect.height/2?'drag-before':'drag-after');
@@ -1263,31 +1264,36 @@ function applyHoldLogic(targetEl, e, allowGroup){
   const isSameTarget = dragState.holdTarget===targetEl;
 
   if(!isSameTarget){
-    // 別ターゲットに移動 → ホールドリセット＆タイマー再起動
+    // 別ターゲットへ移動 → タイマーリセット＆再起動
     if(dragState.holdTimer){clearTimeout(dragState.holdTimer);dragState.holdTimer=null;}
     dragState.holdTarget=targetEl;
     dragState.isHolding=false;
-    dragState.holdTimer=setTimeout(()=>{
-      if(dragState.holdTarget===targetEl){
-        dragState.isHolding=true;
-        clearDragOver();
-        targetEl.classList.add('drag-group-hold');
-      }
-    },1000);
-  }
-
-  // isHolding中はdrag-group-holdを維持（clearDragOverを呼ばない）
-  if(dragState.isHolding){
-    if(!targetEl.classList.contains('drag-group-hold')){
-      clearDragOver();
-      targetEl.classList.add('drag-group-hold');
-    }
-  } else {
-    // タイマー待ち中：drag-before/after表示（holdTimerは止めない）
+    // まず順番変更ハイライトを表示
     clearDragOver();
     const rect=targetEl.getBoundingClientRect();
     targetEl.classList.add((e.clientY-rect.top)<rect.height/2?'drag-before':'drag-after');
+    // 1秒後にグループ化モードへ切り替え
+    dragState.holdTimer=setTimeout(()=>{
+      if(dragState.holdTarget===targetEl){
+        dragState.isHolding=true;
+        // drag-before/after を消してdrag-group-holdを付ける
+        targetEl.classList.remove('drag-before','drag-after');
+        targetEl.classList.add('drag-group-hold');
+      }
+    },1000);
+    return; // ← ここでreturnして以下の処理をスキップ
   }
+
+  // 同じターゲット上でdragoverが続いている場合
+  if(dragState.isHolding){
+    // グループ化モード中 → drag-group-holdを維持するだけ（何もしない）
+    // ※clearDragOverを呼ばないことが重要
+    if(!targetEl.classList.contains('drag-group-hold')){
+      targetEl.classList.add('drag-group-hold');
+    }
+  }
+  // isHolding=falseかつisSameTarget=trueの場合（タイマー待ち中）
+  // → 何もしない（クラスはそのまま維持）
 }
 
 function clearDragOver(){
