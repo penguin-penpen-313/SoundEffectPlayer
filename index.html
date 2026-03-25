@@ -368,7 +368,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
   <header>
     <div class="logo-block">
       <span class="logo">🐧 PSEP</span>
-      <span class="logo-ver">v0.6.10</span>
+      <span class="logo-ver">v0.6.11</span>
     </div>
     <div class="key-hints" id="key-hints-bar"></div>
     <div class="header-right">
@@ -567,7 +567,7 @@ input[type=range].eq-slider::-webkit-slider-thumb{-webkit-appearance:none;width:
 
 <script>
 // =============================================
-// PenguinSoundEffectPlayer  v0.6.10
+// PenguinSoundEffectPlayer  v0.6.11
 // =============================================
 
 // ===== IndexedDB =====
@@ -1125,9 +1125,10 @@ function renderGroupItem(group,idx){
       dragState.dragType='child';
     });
     childEl.addEventListener('dragend',()=>{childEl.classList.remove('dragging');clearDragState();clearDragOver();});
-    // 子音源エリアのdragover
+    // 子音源エリアのdragover：e.stopPropagationでグループ本体へのバブリングを止める
     childEl.addEventListener('dragover',e=>{
       e.preventDefault();
+      e.stopPropagation(); // グループ本体のdragoverに伝播させない
       // 親グループ要素にホールド判定を適用
       const allowGroup = dragState.dragType !== 'group';
       applyHoldLogic(el, e, allowGroup); // el = 親グループ
@@ -1186,11 +1187,6 @@ function renderGroupItem(group,idx){
   // グループ本体：dragover/drop
   el.addEventListener('dragover',e=>{
     e.preventDefault();
-    // childが同グループ内ドラッグの場合は何もしない
-    if(dragState.dragType==='child'){
-      // fromGroupIdxはdragDataから取れないのでdragStateで管理できない
-      // → drop時に同グループ判定するので、ここでは常にapplyHoldLogic
-    }
     const allowGroup = dragState.dragType !== 'group';
     applyHoldLogic(el, e, allowGroup);
   });
